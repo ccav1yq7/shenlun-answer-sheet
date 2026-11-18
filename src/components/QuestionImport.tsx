@@ -5,6 +5,8 @@ import type { FenbiPaper } from '../import/fenbiPdf'
 export interface ImportedQuestion {
   materials: string
   prompt: string
+  paper?: FenbiPaper
+  questionIndex?: number
 }
 
 interface QuestionImportProps {
@@ -18,14 +20,14 @@ export function QuestionImport({ question, onSave, onClose }: QuestionImportProp
   const [draft, setDraft] = useState<ImportedQuestion>(question ?? { materials: '', prompt: '' })
   const [reading, setReading] = useState(false)
   const [error, setError] = useState('')
-  const [paper, setPaper] = useState<FenbiPaper | null>(null)
-  const [questionIndex, setQuestionIndex] = useState(0)
+  const [paper, setPaper] = useState<FenbiPaper | null>(question?.paper ?? null)
+  const [questionIndex, setQuestionIndex] = useState(question?.questionIndex ?? 0)
 
   useEffect(() => {
     dialogRef.current?.showModal()
   }, [])
 
-  async function readText(field: keyof ImportedQuestion, file?: File) {
+  async function readText(field: 'materials' | 'prompt', file?: File) {
     if (!file) return
     setReading(true)
     setError('')
@@ -60,7 +62,20 @@ export function QuestionImport({ question, onSave, onClose }: QuestionImportProp
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (reading || !draft.prompt.trim()) return
-    onSave({ materials: draft.materials.trim(), prompt: draft.prompt.trim() })
+    const materials = draft.materials.trim()
+    const prompt = draft.prompt.trim()
+    onSave({
+      materials,
+      prompt,
+      paper: paper ? {
+        ...paper,
+        materials,
+        questions: paper.questions.map((item, index) => index === questionIndex
+          ? { ...item, prompt: prompt.startsWith(item.label + '\n') ? prompt.slice(item.label.length + 1) : prompt }
+          : item),
+      } : undefined,
+      questionIndex,
+    })
   }
 
   return (
@@ -81,6 +96,12 @@ export function QuestionImport({ question, onSave, onClose }: QuestionImportProp
               选择题目
               <select value={questionIndex} disabled={reading} onChange={(event) => {
                 const index = Number(event.target.value)
+                setPaper({
+                  ...paper,
+                  questions: paper.questions.map((item, i) => i === questionIndex
+                    ? { ...item, prompt: draft.prompt.startsWith(item.label + '\n') ? draft.prompt.slice(item.label.length + 1) : draft.prompt }
+                    : item),
+                })
                 const selected = paper.questions[index]
                 setQuestionIndex(index)
                 setDraft((current) => ({ ...current, prompt: `${selected.label}\n${selected.prompt}` }))

@@ -8,6 +8,7 @@ interface Line {
 
 export interface FenbiPaper {
   materials: string
+  sections: { label: string; text: string }[]
   questions: { label: string; prompt: string }[]
 }
 
@@ -103,8 +104,10 @@ export async function importFenbiPdf(file: File): Promise<FenbiPaper> {
     throw new Error('材料或题干解析不完整，可复制文字后分别粘贴。')
   }
 
+  const sections = materials.map((section) => ({ label: section.label, text: joinLines(section.lines, true) }))
   return {
-    materials: materials.map((section) => `${section.label}\n${joinLines(section.lines, true)}`).join('\n\n'),
+    sections,
+    materials: sections.map((section) => `${section.label}\n${section.text}`).join('\n\n'),
     questions: questions.map((question) => ({ label: question.label, prompt: joinLines(question.lines, false) })),
   }
 }

@@ -302,7 +302,7 @@ select:focus-visible,
   padding: 22px 16px 60px;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: safe center;
   gap: 22px;
 }
 
@@ -454,12 +454,14 @@ select:focus-visible,
 }
 
 .question-pane {
-  flex: 0 0 clamp(min(260px, 34%), var(--question-width, 38%), min(62%, 760px));
+  flex: 0 0 clamp(min(240px, 30%), var(--question-width, 38%), 72%);
   min-height: 0;
-  overflow: auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding: 22px clamp(16px, 2vw, 32px);
   background: var(--panel);
-  border-right: 1px solid var(--line);
   font-size: 16px;
   line-height: 1.75;
 }
@@ -533,9 +535,78 @@ select:focus-visible,
   }
 
   .question-pane {
-    flex-basis: 32%;
-    border-right: 0;
+    flex-basis: 40%;
     border-bottom: 1px solid var(--line);
     padding: 12px 16px;
+  }
+}
+
+.question-pane-tabs {
+  flex: 0 0 auto;
+}
+
+.question-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.question-tabs button {
+  padding: 6px 8px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.question-tabs button[aria-selected="true"] {
+  color: #335bc4;
+  border-bottom-color: #335bc4;
+  font-weight: 650;
+}
+
+.question-prompt-content {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 45%;
+  overflow: auto;
+}
+
+.question-material-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.question-divider {
+  display: grid;
+  place-items: center;
+  flex: 0 0 12px;
+  cursor: col-resize;
+  touch-action: none;
+  border-inline: 1px solid var(--line);
+}
+
+.question-divider::after {
+  content: '';
+  width: 3px;
+  height: 38px;
+  border-radius: 3px;
+  background: #8f9ab2;
+}
+
+.question-divider:hover,
+.question-divider:focus-visible {
+  background: #e3eafb;
+}
+
+@media (max-width: 700px) {
+  .question-divider {
+    display: none;
   }
 }

@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EditorSurface } from './components/EditorSurface'
 import type { EditorSurfaceHandle } from './components/EditorSurface'
 import { SheetView } from './components/SheetView'
+import { QuestionPane } from './components/QuestionPane'
 import { QuestionImport } from './components/QuestionImport'
 import type { ImportedQuestion } from './components/QuestionImport'
 import {
@@ -64,6 +65,11 @@ function paragraphIndexAt(text: string, offset: number): number {
   return count
 }
 
+function questionCapacity(prompt: string): number {
+  const limit = prompt.match(/(?:不超过|不得超过|不多于|字数[：:]?)[^\d]{0,5}(\d+)(?:\s*[-—至到～~]\s*(\d+))?\s*字/)
+  return limit ? Math.max(1, Math.min(20000, Number(limit[2] ?? limit[1]))) : 300
+}
+
 export default function App() {
   const [sheet, setSheet] = useState<AnswerSheet>(() => createSheet('single', 300))
   const [activeBlockId, setActiveBlockId] = useState<string>(() => sheet.blocks[0].id)
@@ -75,6 +81,9 @@ export default function App() {
   const [selection, setSelection] = useState({ start: 0, end: 0 })
   const [zoomMode, setZoomMode] = useState<'fit' | number>('fit')
   const [autoScale, setAutoScale] = useState(1)
+  const [readerWidth, setReaderWidth] = useState(38)
+  const zoomBase = useRef(1)
+  const questionAnswers = useRef(new Map<number, { sheet: AnswerSheet; activeBlockId: string }>())
   const [toast, setToast] = useState<string | null>(null)
 
   useEffect(() => {
@@ -218,6 +227,36 @@ export default function App() {
   }, [geometry.pageWidth])
 
   const scale = zoomMode === 'fit' ? autoScale : zoomMode
+
+  const zoomOffset = zoomMode === 'fit' ? 0
+    : Math.round((zoomBase.current - zoomMode) * geometry.pageWidth * PAGE_PX_PER_MM)
+
+  function changeZoom(delta: number) {
+    if (zoomMode === 'fit') zoomBase.current = scale
+    setZoomMode(Math.max(0.2, Math.min(2, scale + delta)))
+  }
+
+  function selectImportedQuestion(index: number) {
+    if (!question?.paper || index === question.questionIndex) return
+    const selected = question.paper.questions[index]
+    if (!selected) return
+    questionAnswers.current.set(question.questionIndex ?? 0, { sheet, activeBlockId })
+    const capacity = questionCapacity(selected.prompt)
+    const restored = questionAnswers.current.get(index)
+    const fresh = createSheet('single', capacity)
+    fresh.blocks[0].title = selected.label
+    const next = restored?.sheet ?? { ...fresh, columns: sheet.columns, profileKey: sheet.profileKey, showTemplate: sheet.showTemplate }
+    const blockId = restored?.activeBlockId ?? next.blocks[0].id
+    const block = next.blocks.find((item) => item.id === blockId) ?? next.blocks[0]
+    undoStack.current = []
+    redoStack.current = []
+    lastPush.current = { time: 0, blockId: '' }
+    setSheet(next)
+    setActiveBlockId(block.id)
+    setSelection({ start: 0, end: 0 })
+    editorRef.current?.setValue(block.text, 0)
+    setQuestion({ ...question, questionIndex: index, prompt: `${selected.label}\n${selected.prompt}` })
+  }
 
   // 打印容器（.print-root）平时是空的，只有「导出兜底」那条路会往里写一次 ——
   // 于是用户直接按 Cmd+P 时，@media print 会把整个应用藏起来、只剩一个空容器：
@@ -888,19 +927,8 @@ export default function App() {
 
         <div className="answer-workspace">
           {question && showQuestion && (
-            <aside className="question-pane" aria-label="题目与材料" tabIndex={0}
-              style={zoomMode === 'fit' ? undefined : {
-                '--question-width': `calc(100% - ${geometry.pageWidth * PAGE_PX_PER_MM * scale + 44}px)`,
-              } as React.CSSProperties}>
-              <h2>题干</h2>
-              <p>{question.prompt}</p>
-              {question.materials && (
-                <>
-                  <h2>材料</h2>
-                  <p>{question.materials}</p>
-                </>
-              )}
-            </aside>
+            <QuestionPane question={question} onQuestionChange={selectImportedQuestion}
+              zoomOffset={zoomOffset} widthPercent={readerWidth} onWidthChange={setReaderWidth} />
           )}
           <div className="sheet-viewport" ref={viewportRef}>
             <div className="sheet-scaler" ref={exportSourceRef} style={{ zoom: scale } as React.CSSProperties}>
@@ -926,11 +954,11 @@ export default function App() {
         </div>
 
         <div className="zoom-bar">
-          <button type="button" onClick={() => setZoomMode(Math.max(0.3, scale - 0.1))} title="缩小">
+          <button type="button" onClick={() => changeZoom(-0.1)} title="缩小">
             −
           </button>
           <span>{Math.round(scale * 100)}%</span>
-          <button type="button" onClick={() => setZoomMode(Math.min(2, scale + 0.1))} title="放大">
+          <button type="button" onClick={() => changeZoom(0.1)} title="放大">
             ＋
           </button>
           <button type="button" onClick={() => setZoomMode('fit')} title="适应窗口">
@@ -959,6 +987,17 @@ export default function App() {
             <QuestionImport
               question={question}
               onSave={(imported) => {
+                const samePaper = Boolean(question?.paper && question.paper.sections === imported.paper?.sections)
+                if (samePaper && question?.questionIndex !== imported.questionIndex) {
+                  selectImportedQuestion(imported.questionIndex ?? 0)
+                } else if (!samePaper) {
+                  questionAnswers.current.clear()
+                  const selected = imported.paper?.questions[imported.questionIndex ?? 0]
+                  if (selected) updateBlock(activeBlock.id, {
+                    capacity: questionCapacity(selected.prompt),
+                    title: selected.label,
+                  })
+                }
                 setQuestion(imported)
                 setShowQuestion(true)
                 setImportingQuestion(false)
