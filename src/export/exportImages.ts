@@ -53,7 +53,7 @@ export async function exportImages(source: HTMLElement, sheet: AnswerSheet, keep
     const { default: JSZip } = await import('jszip')
     const zip = new JSZip()
     for (const [index, image] of images.entries()) {
-      zip.file(`第${String(index + 1).padStart(3, '0')}页.png`, await image.arrayBuffer())
+      zip.file(`page-${String(index + 1).padStart(3, '0')}.png`, await image.arrayBuffer())
     }
     downloadBlob(await zip.generateAsync({ type: 'blob' }), `${name}.zip`)
   } else {
