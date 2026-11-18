@@ -12,6 +12,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EditorSurface } from './components/EditorSurface'
 import type { EditorSurfaceHandle } from './components/EditorSurface'
 import { SheetView } from './components/SheetView'
+import { QuestionImport } from './components/QuestionImport'
+import type { ImportedQuestion } from './components/QuestionImport'
 import {
   CAPACITY_PRESETS,
   COLUMN_OPTIONS,
@@ -64,6 +66,9 @@ function paragraphIndexAt(text: string, offset: number): number {
 export default function App() {
   const [sheet, setSheet] = useState<AnswerSheet>(() => createSheet('single', 300))
   const [activeBlockId, setActiveBlockId] = useState<string>(() => sheet.blocks[0].id)
+  const [question, setQuestion] = useState<ImportedQuestion | null>(null)
+  const [showQuestion, setShowQuestion] = useState(true)
+  const [importingQuestion, setImportingQuestion] = useState(false)
   const [selection, setSelection] = useState({ start: 0, end: 0 })
   const [zoomMode, setZoomMode] = useState<'fit' | number>('fit')
   const [autoScale, setAutoScale] = useState(1)
@@ -623,6 +628,16 @@ export default function App() {
         }}
       >
           <div className="toolbar-row">
+            <button type="button" className="btn" onClick={() => setImportingQuestion(true)}>
+              {question ? '编辑题目' : '导入题目'}
+            </button>
+            {question && (
+              <button type="button" className="btn" aria-expanded={showQuestion}
+                onClick={() => setShowQuestion((visible) => !visible)}>
+                {showQuestion ? '收起题目' : '展开题目'}
+              </button>
+            )}
+            <span className="toolbar-sep" />
             <span className="toolbar-label">模式</span>
             <div className="chip-group">
               <button
@@ -835,25 +850,39 @@ export default function App() {
           </div>
         </div>
 
-        <div className="sheet-viewport" ref={viewportRef}>
-          <div className="sheet-scaler" ref={exportSourceRef} style={{ zoom: scale } as React.CSSProperties}>
-            <SheetView
-              doc={doc}
-              columns={geometry.columns}
-              activeBlockId={activeBlock.id}
-              tokensByBlockId={tokensByBlockId}
-              compoundRules={profile.compoundRules}
-              selStart={selection.start}
-              selEnd={selection.end}
-              caretRow={caret.rowIndex}
-              caretColumn={caret.column}
-              caretFraction={caret.fraction}
-              showTemplate={sheet.showTemplate}
-              split={isSplit}
-              paperLabel={paperLabel}
-              interactive
-              onPointerDown={handlePointerDown}
-            />
+        <div className="answer-workspace">
+          {question && showQuestion && (
+            <aside className="question-pane" aria-label="题目与材料" tabIndex={0}>
+              <h2>题干</h2>
+              <p>{question.prompt}</p>
+              {question.materials && (
+                <>
+                  <h2>材料</h2>
+                  <p>{question.materials}</p>
+                </>
+              )}
+            </aside>
+          )}
+          <div className="sheet-viewport" ref={viewportRef}>
+            <div className="sheet-scaler" ref={exportSourceRef} style={{ zoom: scale } as React.CSSProperties}>
+              <SheetView
+                doc={doc}
+                columns={geometry.columns}
+                activeBlockId={activeBlock.id}
+                tokensByBlockId={tokensByBlockId}
+                compoundRules={profile.compoundRules}
+                selStart={selection.start}
+                selEnd={selection.end}
+                caretRow={caret.rowIndex}
+                caretColumn={caret.column}
+                caretFraction={caret.fraction}
+                showTemplate={sheet.showTemplate}
+                split={isSplit}
+                paperLabel={paperLabel}
+                interactive
+                onPointerDown={handlePointerDown}
+              />
+            </div>
           </div>
         </div>
 
@@ -887,6 +916,17 @@ export default function App() {
           onFocusRequest={() => undefined}
         />
 
+          {importingQuestion && (
+            <QuestionImport
+              question={question}
+              onSave={(imported) => {
+                setQuestion(imported)
+                setShowQuestion(true)
+                setImportingQuestion(false)
+              }}
+              onClose={() => setImportingQuestion(false)}
+            />
+          )}
           {toast && <div className="toast">{toast}</div>}
       </div>
 
