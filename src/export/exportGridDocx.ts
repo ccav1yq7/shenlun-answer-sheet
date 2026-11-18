@@ -66,7 +66,7 @@ export function buildGridDocxBlob(layout: DocumentLayout, geometry: SheetGeometr
   const document = new Document({
     title: '申论答题卡',
     sections: [
-      ...(frontMatter ? [textDocxSection(frontMatter, { title: frontMatter.blocks.length === 1 ? '题干' : '申论题目', keepIndent: false })] : []),
+      ...(frontMatter ? [textDocxSection(frontMatter, { title: frontMatter.blocks.length === 1 ? frontMatter.blocks[0].title : '申论题目', keepIndent: false })] : []),
       ...layout.pages.map((page, index) => ({
         properties: {
           type: SectionType.NEXT_PAGE,

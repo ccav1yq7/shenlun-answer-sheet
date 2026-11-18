@@ -7,6 +7,7 @@ interface Line {
 }
 
 export interface FenbiPaper {
+  title: string
   materials: string
   sections: { label: string; text: string }[]
   questions: { label: string; prompt: string }[]
@@ -106,6 +107,7 @@ export async function importFenbiPdf(file: File): Promise<FenbiPaper> {
 
   const sections = materials.map((section) => ({ label: section.label, text: joinLines(section.lines, true) }))
   return {
+    title: file.name.replace(/\.pdf$/i, ''),
     sections,
     materials: sections.map((section) => `${section.label}\n${section.text}`).join('\n\n'),
     questions: questions.map((question) => ({ label: question.label, prompt: joinLines(question.lines, false) })),

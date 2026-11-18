@@ -1,13 +1,22 @@
 import { createBlock } from '../document/model'
 import type { AnswerSheet } from '../document/model'
+import type { ReadingMark } from '../components/AnnotatedText'
 import type { ImportedQuestion } from '../components/QuestionImport'
 
-export function questionBlocks(question: ImportedQuestion | null) {
+export function questionBlocks(question: ImportedQuestion | null, content = { prompt: true, materials: true }) {
   if (!question) return []
   return [
-    { ...createBlock('题干', 0, false), text: question.prompt },
-    ...(question.materials ? [{ ...createBlock('材料', 0, false), text: question.materials }] : []),
+    ...(content.prompt ? [{ ...createBlock('题干', 0, false), text: question.prompt }] : []),
+    ...(content.materials && question.materials ? [{ ...createBlock('材料', 0, false), text: question.materials }] : []),
   ]
+}
+
+export function readingNotesBlock(marks: ReadingMark[]) {
+  const text = marks.map((mark) => {
+    const excerpt = `【${mark.label} · ${mark.note?.kind ?? '标记'}】\n原文：${mark.quote}`
+    return mark.note ? `${excerpt}\n笔记：${mark.note.text}` : excerpt
+  }).join('\n\n')
+  return { ...createBlock('标记与笔记', 0, false), text }
 }
 
 export function includeQuestion(sheet: AnswerSheet, question: ImportedQuestion | null): AnswerSheet {

@@ -12,6 +12,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EditorSurface } from './components/EditorSurface'
 import type { EditorSurfaceHandle } from './components/EditorSurface'
 import { SheetView } from './components/SheetView'
+import type { ReadingMark } from './components/AnnotatedText'
+import { PracticeDialog } from './components/PracticeDialog'
+import { readPracticeDefaults, writePractice, writePracticeDefaults } from './document/practiceStore'
+import type { PracticePreferences, PracticeSnapshot, SavedPractice } from './document/practiceStore'
 import { QuestionPane } from './components/QuestionPane'
 import { QuestionImport } from './components/QuestionImport'
 import type { ImportedQuestion } from './components/QuestionImport'
@@ -25,7 +29,7 @@ import {
   sheetToPlainText,
 } from './document/model'
 import type { AnswerBlock, AnswerSheet, ParagraphStyle } from './document/model'
-import { includeQuestion, questionBlocks } from './export/questionContent'
+import { includeQuestion, questionBlocks, readingNotesBlock } from './export/questionContent'
 import { buildPrintHtml, exportPdfViaPrint } from './export/exportPdf'
 import { describeUnsupportedChars, findUnsupportedChars } from './export/pdfFontCharset'
 import {
@@ -71,18 +75,31 @@ function questionCapacity(prompt: string): number {
 }
 
 export default function App() {
-  const [sheet, setSheet] = useState<AnswerSheet>(() => createSheet('single', 300))
+  const [defaults, setDefaults] = useState(readPracticeDefaults)
+  const [sheet, setSheet] = useState<AnswerSheet>(() => {
+    const initial = createSheet('single', defaults.capacity ?? 300)
+    return {
+      ...initial,
+      columns: defaults.columns ?? initial.columns,
+      profileKey: defaults.profileKey ?? initial.profileKey,
+      showTemplate: defaults.showTemplate ?? initial.showTemplate,
+    }
+  })
+  const [practiceDialog, setPracticeDialog] = useState<'save' | 'list' | null>(() =>
+    new URLSearchParams(window.location.search).get('practice') === '1' ? 'list' : null)
+  const [currentPractice, setCurrentPractice] = useState<SavedPractice | null>(null)
   const [activeBlockId, setActiveBlockId] = useState<string>(() => sheet.blocks[0].id)
+  const [marks, setMarks] = useState<ReadingMark[]>([])
   const [question, setQuestion] = useState<ImportedQuestion | null>(null)
   const questionRef = useRef(question)
   questionRef.current = question
   const [showQuestion, setShowQuestion] = useState(true)
   const [importingQuestion, setImportingQuestion] = useState(false)
   const [selection, setSelection] = useState({ start: 0, end: 0 })
-  const [zoomMode, setZoomMode] = useState<'fit' | number>('fit')
+  const [zoomMode, setZoomMode] = useState<'fit' | number>(defaults.zoom ?? 'fit')
   const [autoScale, setAutoScale] = useState(1)
-  const [readerWidth, setReaderWidth] = useState(38)
-  const zoomBase = useRef(1)
+  const [readerWidth, setReaderWidth] = useState(defaults.readerWidth ?? 38)
+  const zoomBase = useRef(defaults.zoomBase ?? 1)
   const questionAnswers = useRef(new Map<number, { sheet: AnswerSheet; activeBlockId: string }>())
   const [toast, setToast] = useState<string | null>(null)
 
@@ -118,7 +135,8 @@ export default function App() {
   activeBlockIdRef.current = activeBlockId
 
   const editorRef = useRef<EditorSurfaceHandle | null>(null)
-  const [keepExportFormat, setKeepExportFormat] = useState(true)
+  const [exportContent, setExportContent] = useState(defaults.exportContent ?? { prompt: true, materials: true, notes: false, answer: true })
+  const [keepExportFormat, setKeepExportFormat] = useState(defaults.keepExportFormat ?? true)
   const [exporting, setExporting] = useState(false)
   const exportSourceRef = useRef<HTMLDivElement | null>(null)
   const printRef = useRef<HTMLDivElement | null>(null)
@@ -256,6 +274,91 @@ export default function App() {
     setSelection({ start: 0, end: 0 })
     editorRef.current?.setValue(block.text, 0)
     setQuestion({ ...question, questionIndex: index, prompt: `${selected.label}\n${selected.prompt}` })
+  }
+
+  function practicePreferences(capacity: number): PracticePreferences {
+    return {
+      capacity,
+      columns: sheet.columns,
+      profileKey: sheet.profileKey,
+      showTemplate: sheet.showTemplate,
+      readerWidth,
+      zoom: zoomMode,
+      zoomBase: zoomBase.current,
+      exportContent,
+      keepExportFormat,
+    }
+  }
+
+  function practiceSnapshot(): PracticeSnapshot {
+    return {
+      sheet,
+      activeBlockId,
+      question,
+      marks,
+      showQuestion,
+      preferences: practicePreferences(activeCapacity),
+      otherAnswers: [...questionAnswers.current.entries()]
+        .filter(([index]) => index !== (question?.questionIndex ?? 0))
+        .sort(([a], [b]) => a - b),
+    }
+  }
+
+  function savePractice(name: string, asCopy: boolean) {
+    try {
+      const record = {
+        id: asCopy ? crypto.randomUUID() : currentPractice?.id ?? crypto.randomUUID(),
+        name,
+        updatedAt: new Date().toISOString(),
+        snapshot: practiceSnapshot(),
+      }
+      writePractice(record)
+      setCurrentPractice(record)
+      setPracticeDialog(null)
+      showToast('练习已保存到当前浏览器')
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  function openPractice(record: SavedPractice) {
+    const current = practiceSnapshot()
+    const hasWork = question || marks.length || sheet.blocks.some((block) => block.text.trim())
+    if (hasWork && JSON.stringify(current) !== JSON.stringify(currentPractice?.snapshot)
+      && !window.confirm('当前练习有未保存的内容。继续打开已保存的练习吗？')) return
+    const saved = record.snapshot
+    const block = saved.sheet.blocks.find((item) => item.id === saved.activeBlockId) ?? saved.sheet.blocks[0]
+    setSheet(saved.sheet)
+    setActiveBlockId(block.id)
+    setSelection({ start: 0, end: 0 })
+    editorRef.current?.setValue(block.text, 0)
+    setQuestion(saved.question)
+    setMarks(saved.marks)
+    setShowQuestion(saved.showQuestion)
+    questionAnswers.current = new Map(saved.otherAnswers)
+    undoStack.current = []
+    redoStack.current = []
+    lastPush.current = { time: 0, blockId: '' }
+    setReaderWidth(saved.preferences.readerWidth)
+    setZoomMode(saved.preferences.zoom)
+    zoomBase.current = saved.preferences.zoomBase
+    setExportContent(saved.preferences.exportContent)
+    setKeepExportFormat(saved.preferences.keepExportFormat)
+    setCurrentPractice(record)
+    setPracticeDialog(null)
+    showToast('已打开「' + record.name + '」')
+  }
+
+  function saveDefaults() {
+    const preferences = practicePreferences(activeCapacity)
+    try {
+      writePracticeDefaults(preferences)
+      setDefaults(preferences)
+      showToast('已保存当前版式和导出选项为默认设置')
+    } catch {
+      showToast('无法保存默认设置，请检查浏览器存储权限')
+    }
   }
 
   // 打印容器（.print-root）平时是空的，只有「导出兜底」那条路会往里写一次 ——
@@ -557,14 +660,14 @@ export default function App() {
     }
   }, [sheet, showToast])
 
-  const handleExportPdf = useCallback(async (exportSheet: AnswerSheet) => {
+  const handleExportPdf = useCallback(async (exportSheet: AnswerSheet, title?: string) => {
     const container = printRef.current
     const fallbackToPrint = async (reason: string) => {
       if (!container) return
       showToast(`${reason}，改用打印版导出：请在对话框中选择「另存为 PDF」`)
       container.dataset.exporting = 'true'
       try {
-        await exportPdfViaPrint(container, exportSheet, { keepIndent: false })
+        await exportPdfViaPrint(container, exportSheet, { keepIndent: false, title })
       } finally {
         delete container.dataset.exporting
       }
@@ -582,35 +685,49 @@ export default function App() {
 
     try {
       const { exportPdfDirect } = await import('./export/exportPdfDirect')
-      await exportPdfDirect(exportSheet, { keepIndent: false })
+      await exportPdfDirect(exportSheet, { keepIndent: false, title })
       showToast('已导出 PDF（纯文字，不含方格，可直接下载）')
     } catch (error) {
       await fallbackToPrint(`直接导出失败（${error instanceof Error ? error.message : String(error)}）`)
     }
   }, [showToast])
 
+  const activeMarks = marks.filter((mark) =>
+    !mark.source.startsWith('prompt-') || mark.source === `prompt-${question?.questionIndex ?? 0}`)
+
   const handleExport = async (format: '图片' | 'Word' | 'PDF') => {
     if (exporting) return
+    const frontBlocks = questionBlocks(question, exportContent)
+    if (exportContent.notes && activeMarks.length) frontBlocks.push(readingNotesBlock(activeMarks))
+    const frontMatter = frontBlocks.length ? { ...sheet, blocks: frontBlocks } : undefined
+    const exportSheet = {
+      ...sheet,
+      blocks: [...frontBlocks, ...(exportContent.answer ? sheet.blocks : [])],
+    }
+    if (!exportSheet.blocks.length) {
+      showToast('请至少勾选一项可导出的内容')
+      return
+    }
+    const withGrid = exportContent.answer && keepExportFormat
+    const title = !exportContent.answer && exportSheet.blocks.length === 1 ? exportSheet.blocks[0].title : undefined
     setExporting(true)
-    const frontMatter = question ? { ...sheet, blocks: questionBlocks(question) } : undefined
-    const exportSheet = frontMatter ? { ...sheet, blocks: [...frontMatter.blocks, ...sheet.blocks] } : sheet
     try {
       if (format === 'Word') {
-        if (keepExportFormat) {
+        if (withGrid) {
           const { exportGridDocx } = await import('./export/exportGridDocx')
           await exportGridDocx(doc, geometry, frontMatter)
         } else {
           const { exportDocx } = await import('./export/exportDocx')
-          await exportDocx(exportSheet, { keepIndent: false })
+          await exportDocx(exportSheet, { keepIndent: false, title })
         }
-      } else if (format === 'PDF' && !keepExportFormat) {
-        await handleExportPdf(exportSheet)
+      } else if (format === 'PDF' && !withGrid) {
+        await handleExportPdf(exportSheet, title)
         return
       } else {
         const source = exportSourceRef.current
         if (!source) throw new Error('答题卡尚未就绪')
         const { exportImages, exportGridPdf } = await import('./export/exportImages')
-        if (format === '图片') await exportImages(source, exportSheet, keepExportFormat, frontMatter)
+        if (format === '图片') await exportImages(source, exportSheet, withGrid, frontMatter)
         else await exportGridPdf(source, geometry, frontMatter)
       }
       showToast(`已导出${format}`)
@@ -712,6 +829,11 @@ export default function App() {
                 {showQuestion ? '收起题目' : '展开题目'}
               </button>
             )}
+            <span className="toolbar-sep" />
+            <button type="button" className="btn" onClick={() => setPracticeDialog('save')}>保存练习</button>
+            <button type="button" className="btn" onClick={() => setPracticeDialog('list')}>我的练习</button>
+            <button type="button" className="btn" onClick={saveDefaults}
+              title="保存当前字数、列数、版式、缩放、阅读栏宽度和导出选项">保存为默认设置</button>
             <span className="toolbar-sep" />
             <span className="toolbar-label">模式</span>
             <div className="chip-group">
@@ -860,6 +982,26 @@ export default function App() {
                 复制整卷
               </button>
             )}
+            <details className="export-content">
+              <summary className="btn">导出内容</summary>
+              <div className="export-content-menu" role="group" aria-label="导出内容">
+                {([
+                  ['prompt', '题干', Boolean(question?.prompt)],
+                  ['materials', '材料', Boolean(question?.materials)],
+                  ['notes', '标记与笔记', activeMarks.length > 0],
+                  ['answer', '作答', true],
+                ] as const).map(([key, label, available]) => (
+                  <label key={key}>
+                    <input type="checkbox" checked={available && exportContent[key]} disabled={exporting || !available}
+                      onChange={(event) => {
+                        const checked = event.target.checked
+                        setExportContent((current) => ({ ...current, [key]: checked }))
+                      }} />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </details>
             {(['图片', 'Word', 'PDF'] as const).map((format) => (
               <button type="button" className="btn btn--primary" key={format}
                 disabled={exporting} onClick={() => void handleExport(format)}>
@@ -867,7 +1009,7 @@ export default function App() {
               </button>
             ))}
             <label className="toolbar-label">
-              <input type="checkbox" checked={keepExportFormat} disabled={exporting}
+              <input type="checkbox" checked={exportContent.answer && keepExportFormat} disabled={exporting || !exportContent.answer}
                 onChange={(event) => setKeepExportFormat(event.target.checked)} />
               保留方格格式
             </label>
@@ -928,7 +1070,9 @@ export default function App() {
         <div className="answer-workspace">
           {question && showQuestion && (
             <QuestionPane question={question} onQuestionChange={selectImportedQuestion}
-              zoomOffset={zoomOffset} widthPercent={readerWidth} onWidthChange={setReaderWidth} />
+              zoomOffset={zoomOffset} widthPercent={readerWidth} onWidthChange={setReaderWidth}
+              marks={marks} onSaveMark={(mark) => setMarks((current) => [...current.filter((item) => item.id !== mark.id), mark])}
+              onRemoveMark={(id) => setMarks((current) => current.filter((mark) => mark.id !== id))} />
           )}
           <div className="sheet-viewport" ref={viewportRef}>
             <div className="sheet-scaler" ref={exportSourceRef} style={{ zoom: scale } as React.CSSProperties}>
@@ -983,6 +1127,12 @@ export default function App() {
           onFocusRequest={() => undefined}
         />
 
+          {practiceDialog && (
+            <PracticeDialog mode={practiceDialog}
+              name={currentPractice?.name ?? question?.paper?.title ?? '申论练习'}
+              canUpdate={currentPractice !== null}
+              onSave={savePractice} onOpen={openPractice} onClose={() => setPracticeDialog(null)} />
+          )}
           {importingQuestion && (
             <QuestionImport
               question={question}
@@ -992,6 +1142,10 @@ export default function App() {
                   selectImportedQuestion(imported.questionIndex ?? 0)
                 } else if (!samePaper) {
                   questionAnswers.current.clear()
+                  if (imported.paper || !question) {
+                    setMarks([])
+                    setCurrentPractice(null)
+                  }
                   const selected = imported.paper?.questions[imported.questionIndex ?? 0]
                   if (selected) updateBlock(activeBlock.id, {
                     capacity: questionCapacity(selected.prompt),
