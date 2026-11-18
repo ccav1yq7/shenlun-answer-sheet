@@ -77,6 +77,9 @@ export default function App() {
   activeBlockIdRef.current = activeBlockId
 
   const editorRef = useRef<EditorSurfaceHandle | null>(null)
+  const [keepExportFormat, setKeepExportFormat] = useState(true)
+  const [exporting, setExporting] = useState(false)
+  const exportSourceRef = useRef<HTMLDivElement | null>(null)
   const printRef = useRef<HTMLDivElement | null>(null)
   const viewportRef = useRef<HTMLDivElement | null>(null)
 
@@ -481,33 +484,12 @@ export default function App() {
     }
   }, [sheet, showToast])
 
-  const handleExportDocx = useCallback(async () => {
-    try {
-      // docx 库体积较大，按需加载，不拖慢首屏
-      const { exportDocx } = await import('./export/exportDocx')
-      await exportDocx(sheet, { keepIndent: true })
-      showToast('已导出 Word（纯文字，不含方格）')
-    } catch (error) {
-      showToast(`导出 Word 失败：${error instanceof Error ? error.message : String(error)}`)
-    }
-  }, [sheet, showToast])
-
-  const handleExportGridDocx = useCallback(async () => {
-    try {
-      const { exportGridDocx } = await import('./export/exportGridDocx')
-      await exportGridDocx(doc, geometry)
-      showToast('已导出方格 Word')
-    } catch (error) {
-      showToast(`导出方格 Word 失败：${error instanceof Error ? error.message : String(error)}`)
-    }
-  }, [doc, geometry, showToast])
-
   const handleExportPdf = useCallback(async () => {
     const container = printRef.current
     const fallbackToPrint = async (reason: string) => {
       if (!container) return
       showToast(`${reason}，改用打印版导出：请在对话框中选择「另存为 PDF」`)
-      await exportPdfViaPrint(container, sheet, { keepIndent: true })
+      await exportPdfViaPrint(container, sheet, { keepIndent: false })
     }
 
     // 内置字体覆盖不到的生僻字 → 直接换打印版，避免 PDF 里出现空白或豆腐块。
@@ -522,12 +504,42 @@ export default function App() {
 
     try {
       const { exportPdfDirect } = await import('./export/exportPdfDirect')
-      await exportPdfDirect(sheet, { keepIndent: true })
+      await exportPdfDirect(sheet, { keepIndent: false })
       showToast('已导出 PDF（纯文字，不含方格，可直接下载）')
     } catch (error) {
       await fallbackToPrint(`直接导出失败（${error instanceof Error ? error.message : String(error)}）`)
     }
   }, [sheet, showToast])
+
+  const handleExport = async (format: '图片' | 'Word' | 'PDF') => {
+    if (exporting) return
+    setExporting(true)
+    try {
+      if (format === 'Word') {
+        if (keepExportFormat) {
+          const { exportGridDocx } = await import('./export/exportGridDocx')
+          await exportGridDocx(doc, geometry)
+        } else {
+          const { exportDocx } = await import('./export/exportDocx')
+          await exportDocx(sheet, { keepIndent: false })
+        }
+      } else if (format === 'PDF' && !keepExportFormat) {
+        await handleExportPdf()
+        return
+      } else {
+        const source = exportSourceRef.current
+        if (!source) throw new Error('答题卡尚未就绪')
+        const { exportImages, exportGridPdf } = await import('./export/exportImages')
+        if (format === '图片') await exportImages(source, sheet, keepExportFormat)
+        else await exportGridPdf(source, sheet, geometry)
+      }
+      showToast(`已导出${format}`)
+    } catch (error) {
+      showToast(`导出${format}失败：${error instanceof Error ? error.message : String(error)}`)
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const applyParagraphStyle = useCallback(
     (patch: Partial<ParagraphStyle>) => {
@@ -749,7 +761,7 @@ export default function App() {
             </button>
             <span
               className="toolbar-hint"
-              title="复制出来的是原始文字。段首缩进属于排版格式而不是空格字符，粘贴到 Word 等外部程序时不会带过去；需要保留首行缩进请用「导出 Word / 导出 PDF」。"
+              title="复制出来的是原始文字。段首缩进属于排版格式而不是空格字符，粘贴到 Word 等外部程序时不会带过去；需要保留答题卡缩进请勾选「保留方格格式」后导出。"
             >
               缩进不随复制带出
             </span>
@@ -758,15 +770,17 @@ export default function App() {
                 复制整卷
               </button>
             )}
-            <button type="button" className="btn btn--primary" onClick={handleExportDocx}>
-              导出文字 Word
-            </button>
-            <button type="button" className="btn btn--primary" onClick={handleExportGridDocx}>
-              导出方格 Word
-            </button>
-            <button type="button" className="btn btn--primary" onClick={handleExportPdf}>
-              导出 PDF
-            </button>
+            {(['图片', 'Word', 'PDF'] as const).map((format) => (
+              <button type="button" className="btn btn--primary" key={format}
+                disabled={exporting} onClick={() => void handleExport(format)}>
+                导出{format === '图片' ? '' : ' '}{format}
+              </button>
+            ))}
+            <label className="toolbar-label">
+              <input type="checkbox" checked={keepExportFormat} disabled={exporting}
+                onChange={(event) => setKeepExportFormat(event.target.checked)} />
+              保留方格格式
+            </label>
 
             <span className="toolbar-sep" />
             <label className="toolbar-label">
@@ -822,7 +836,7 @@ export default function App() {
         </div>
 
         <div className="sheet-viewport" ref={viewportRef}>
-          <div className="sheet-scaler" style={{ zoom: scale } as React.CSSProperties}>
+          <div className="sheet-scaler" ref={exportSourceRef} style={{ zoom: scale } as React.CSSProperties}>
             <SheetView
               doc={doc}
               columns={geometry.columns}

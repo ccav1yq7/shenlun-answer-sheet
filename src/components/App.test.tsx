@@ -711,6 +711,7 @@ describe('打印容器', () => {
   it('导出 PDF 会把干净文字写进打印容器', async () => {
     const { container, textarea } = setup()
     type(textarea, '当前，我国经济社会发展进入新阶段。')
+    fireEvent.click(screen.getByRole('checkbox', { name: '保留方格格式' }))
     clickChip('导出 PDF')
     await waitFor(() => {
       const printRoot = container.querySelector('.print-root')!
