@@ -18,6 +18,7 @@ function paragraph(text: string, size: number) {
     children: [new TextRun({
       text: text.replace(/[\u0000-\u001F\uFFFE\uFFFF]/g, ''),
       size,
+      font: { ascii: 'Arial', hAnsi: 'Arial', eastAsia: 'Noto Sans SC' },
     })],
   })
 }
