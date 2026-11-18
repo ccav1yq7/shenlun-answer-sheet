@@ -5,7 +5,8 @@ import {
 } from 'docx'
 import type { DocumentLayout, Panel } from '../layout'
 import type { SheetGeometry } from '../sheet/geometry'
-import { downloadBlob, timestamp } from './exportDocx'
+import type { AnswerSheet } from '../document/model'
+import { downloadBlob, textDocxSection, timestamp } from './exportDocx'
 
 const red = { style: BorderStyle.SINGLE, color: 'B74949', size: 4 }
 const hidden = { style: BorderStyle.NONE }
@@ -52,7 +53,7 @@ function panelContent(panel: Panel, geometry: SheetGeometry, cellWidth: number) 
   return [paragraph(`${heading} · ${panel.capacity} 格`, 22), grid, paragraph('', 2)]
 }
 
-export function buildGridDocxBlob(layout: DocumentLayout, geometry: SheetGeometry): Promise<Blob> {
+export function buildGridDocxBlob(layout: DocumentLayout, geometry: SheetGeometry, frontMatter?: AnswerSheet): Promise<Blob> {
   const cellWidth = twips(geometry.cell)
   const panelWidth = cellWidth * geometry.columns
   const gap = twips(geometry.panelGap)
@@ -64,47 +65,50 @@ export function buildGridDocxBlob(layout: DocumentLayout, geometry: SheetGeometr
   const sideMargin = Math.floor((pageWidth - sectionWidth) / 2)
   const document = new Document({
     title: '申论答题卡',
-    sections: layout.pages.map((page, index) => ({
-      properties: {
-        type: SectionType.NEXT_PAGE,
-        page: {
-          // docx exchanges dimensions when serializing landscape sections.
-          size: landscape
-            ? { width: pageHeight, height: pageWidth, orientation: PageOrientation.LANDSCAPE }
-            : { width: pageWidth, height: pageHeight },
-          margin: { left: sideMargin, right: sideMargin, top: twips(12), bottom: twips(12) },
-        },
-      },
-      children: [
-        paragraph('申论答题卡', 36),
-        paragraph(`第 ${index + 1} 页 / 共 ${layout.pages.length} 页`, 20),
-        new Table({
-          layout: TableLayoutType.FIXED,
-          width: { size: sectionWidth, type: WidthType.DXA },
-          columnWidths,
-          margins,
-          borders: {
-            top: hidden, bottom: hidden, left: hidden, right: hidden,
-            insideHorizontal: hidden, insideVertical: hidden,
+    sections: [
+      ...(frontMatter ? [textDocxSection(frontMatter, { title: frontMatter.blocks.length === 1 ? '题干' : '申论题目', keepIndent: false })] : []),
+      ...layout.pages.map((page, index) => ({
+        properties: {
+          type: SectionType.NEXT_PAGE,
+          page: {
+            // docx exchanges dimensions when serializing landscape sections.
+            size: landscape
+              ? { width: pageHeight, height: pageWidth, orientation: PageOrientation.LANDSCAPE }
+              : { width: pageWidth, height: pageHeight },
+            margin: { left: sideMargin, right: sideMargin, top: twips(12), bottom: twips(12) },
           },
-          rows: [new TableRow({
-            children: columnWidths.map((width, column) => {
-              const panel = page.panels.find((item) => item.slot * 2 === column)
-              return new TableCell({
-                width: { size: width, type: WidthType.DXA },
-                children: panel ? panelContent(panel, geometry, cellWidth) : [paragraph('', 2)],
-              })
-            }),
-          })],
-        }),
-        paragraph('', 2),
-      ],
-    })),
+        },
+        children: [
+          paragraph('申论答题卡', 36),
+          paragraph(`第 ${index + 1} 页 / 共 ${layout.pages.length} 页`, 20),
+          new Table({
+            layout: TableLayoutType.FIXED,
+            width: { size: sectionWidth, type: WidthType.DXA },
+            columnWidths,
+            margins,
+            borders: {
+              top: hidden, bottom: hidden, left: hidden, right: hidden,
+              insideHorizontal: hidden, insideVertical: hidden,
+            },
+            rows: [new TableRow({
+              children: columnWidths.map((width, column) => {
+                const panel = page.panels.find((item) => item.slot * 2 === column)
+                return new TableCell({
+                  width: { size: width, type: WidthType.DXA },
+                  children: panel ? panelContent(panel, geometry, cellWidth) : [paragraph('', 2)],
+                })
+              }),
+            })],
+          }),
+          paragraph('', 2),
+        ],
+      })),
+    ],
   })
   return Packer.toBlob(document)
 }
 
-export async function exportGridDocx(layout: DocumentLayout, geometry: SheetGeometry): Promise<void> {
-  const blob = await buildGridDocxBlob(layout, geometry)
+export async function exportGridDocx(layout: DocumentLayout, geometry: SheetGeometry, frontMatter?: AnswerSheet): Promise<void> {
+  const blob = await buildGridDocxBlob(layout, geometry, frontMatter)
   downloadBlob(blob, `申论方格答题卡-${timestamp()}.docx`)
 }

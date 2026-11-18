@@ -454,7 +454,7 @@ select:focus-visible,
 }
 
 .question-pane {
-  flex: 0 0 clamp(260px, 38%, 620px);
+  flex: 0 0 clamp(min(260px, 34%), var(--question-width, 38%), min(62%, 760px));
   min-height: 0;
   overflow: auto;
   padding: 22px clamp(16px, 2vw, 32px);

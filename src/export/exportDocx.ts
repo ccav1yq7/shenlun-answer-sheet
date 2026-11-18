@@ -114,7 +114,7 @@ function alignmentOf(align: ParagraphStyle['align']) {
 }
 
 /** 生成 .docx 的 Blob */
-export async function buildDocxBlob(sheet: AnswerSheet, options: DocxExportOptions = {}): Promise<Blob> {
+export function textDocxSection(sheet: AnswerSheet, options: DocxExportOptions = {}) {
   const keepIndent = options.keepIndent ?? true
   const blocks = options.blocks ?? sheet.blocks
   const children: Paragraph[] = []
@@ -157,35 +157,27 @@ export async function buildDocxBlob(sheet: AnswerSheet, options: DocxExportOptio
     children.push(new Paragraph({ children: [new TextRun({ text: '' })] }))
   }
 
-  const doc = new Document({
-    creator: '申论电脑模拟答题卡',
-    description: '由申论方格答题卡导出的纯文本内容（不含答题格）',
-    styles: {
-      default: {
-        document: {
-          run: { font: FONT_BODY, size: SIZE_BODY },
+  return {
+    properties: {
+      page: {
+        size: { width: convertMillimetersToTwip(210), height: convertMillimetersToTwip(297) },
+        margin: {
+          top: convertMillimetersToTwip(37),
+          bottom: convertMillimetersToTwip(35),
+          left: convertMillimetersToTwip(28),
+          right: convertMillimetersToTwip(26),
         },
       },
     },
-    sections: [
-      {
-        properties: {
-          page: {
-            size: {
-              width: convertMillimetersToTwip(210),
-              height: convertMillimetersToTwip(297),
-            },
-            margin: {
-              top: convertMillimetersToTwip(37),
-              bottom: convertMillimetersToTwip(35),
-              left: convertMillimetersToTwip(28),
-              right: convertMillimetersToTwip(26),
-            },
-          },
-        },
-        children,
-      },
-    ],
+    children,
+  }
+}
+
+export function buildDocxBlob(sheet: AnswerSheet, options: DocxExportOptions = {}): Promise<Blob> {
+  const doc = new Document({
+    creator: '申论电脑模拟答题卡',
+    styles: { default: { document: { run: { font: FONT_BODY, size: SIZE_BODY } } } },
+    sections: [textDocxSection(sheet, options)],
   })
 
   return Packer.toBlob(doc)

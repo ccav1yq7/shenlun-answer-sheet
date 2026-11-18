@@ -24,6 +24,7 @@ import {
   sheetToPlainText,
 } from './document/model'
 import type { AnswerBlock, AnswerSheet, ParagraphStyle } from './document/model'
+import { includeQuestion, questionBlocks } from './export/questionContent'
 import { buildPrintHtml, exportPdfViaPrint } from './export/exportPdf'
 import { describeUnsupportedChars, findUnsupportedChars } from './export/pdfFontCharset'
 import {
@@ -67,6 +68,8 @@ export default function App() {
   const [sheet, setSheet] = useState<AnswerSheet>(() => createSheet('single', 300))
   const [activeBlockId, setActiveBlockId] = useState<string>(() => sheet.blocks[0].id)
   const [question, setQuestion] = useState<ImportedQuestion | null>(null)
+  const questionRef = useRef(question)
+  questionRef.current = question
   const [showQuestion, setShowQuestion] = useState(true)
   const [importingQuestion, setImportingQuestion] = useState(false)
   const [selection, setSelection] = useState({ start: 0, end: 0 })
@@ -224,7 +227,9 @@ export default function App() {
     const container = printRef.current
     if (!container) return
     const refresh = () => {
-      container.innerHTML = buildPrintHtml(sheetRef.current, { keepIndent: true })
+      if (!container.dataset.exporting) {
+        container.innerHTML = buildPrintHtml(includeQuestion(sheetRef.current, questionRef.current), { keepIndent: true })
+      }
     }
     window.addEventListener('beforeprint', refresh)
     return () => window.removeEventListener('beforeprint', refresh)
@@ -513,18 +518,23 @@ export default function App() {
     }
   }, [sheet, showToast])
 
-  const handleExportPdf = useCallback(async () => {
+  const handleExportPdf = useCallback(async (exportSheet: AnswerSheet) => {
     const container = printRef.current
     const fallbackToPrint = async (reason: string) => {
       if (!container) return
       showToast(`${reason}，改用打印版导出：请在对话框中选择「另存为 PDF」`)
-      await exportPdfViaPrint(container, sheet, { keepIndent: false })
+      container.dataset.exporting = 'true'
+      try {
+        await exportPdfViaPrint(container, exportSheet, { keepIndent: false })
+      } finally {
+        delete container.dataset.exporting
+      }
     }
 
     // 内置字体覆盖不到的生僻字 → 直接换打印版，避免 PDF 里出现空白或豆腐块。
     // 提示里必须带上码点：这些字符常常长得跟普通空格/引号一模一样，
     // 只显示字符本身用户根本看不出要改哪儿。
-    const unsupported = findUnsupportedChars(sheet.blocks.map((b) => b.text).join(''))
+    const unsupported = findUnsupportedChars(exportSheet.blocks.map((b) => b.text).join(''))
     if (unsupported.length > 0) {
       const more = unsupported.length > 3 ? ` 等 ${unsupported.length} 个` : ''
       await fallbackToPrint(`有 ${describeUnsupportedChars(unsupported)}${more} 内置字体没有字形`)
@@ -533,34 +543,36 @@ export default function App() {
 
     try {
       const { exportPdfDirect } = await import('./export/exportPdfDirect')
-      await exportPdfDirect(sheet, { keepIndent: false })
+      await exportPdfDirect(exportSheet, { keepIndent: false })
       showToast('已导出 PDF（纯文字，不含方格，可直接下载）')
     } catch (error) {
       await fallbackToPrint(`直接导出失败（${error instanceof Error ? error.message : String(error)}）`)
     }
-  }, [sheet, showToast])
+  }, [showToast])
 
   const handleExport = async (format: '图片' | 'Word' | 'PDF') => {
     if (exporting) return
     setExporting(true)
+    const frontMatter = question ? { ...sheet, blocks: questionBlocks(question) } : undefined
+    const exportSheet = frontMatter ? { ...sheet, blocks: [...frontMatter.blocks, ...sheet.blocks] } : sheet
     try {
       if (format === 'Word') {
         if (keepExportFormat) {
           const { exportGridDocx } = await import('./export/exportGridDocx')
-          await exportGridDocx(doc, geometry)
+          await exportGridDocx(doc, geometry, frontMatter)
         } else {
           const { exportDocx } = await import('./export/exportDocx')
-          await exportDocx(sheet, { keepIndent: false })
+          await exportDocx(exportSheet, { keepIndent: false })
         }
       } else if (format === 'PDF' && !keepExportFormat) {
-        await handleExportPdf()
+        await handleExportPdf(exportSheet)
         return
       } else {
         const source = exportSourceRef.current
         if (!source) throw new Error('答题卡尚未就绪')
         const { exportImages, exportGridPdf } = await import('./export/exportImages')
-        if (format === '图片') await exportImages(source, sheet, keepExportFormat)
-        else await exportGridPdf(source, sheet, geometry)
+        if (format === '图片') await exportImages(source, exportSheet, keepExportFormat, frontMatter)
+        else await exportGridPdf(source, geometry, frontMatter)
       }
       showToast(`已导出${format}`)
     } catch (error) {
@@ -876,7 +888,10 @@ export default function App() {
 
         <div className="answer-workspace">
           {question && showQuestion && (
-            <aside className="question-pane" aria-label="题目与材料" tabIndex={0}>
+            <aside className="question-pane" aria-label="题目与材料" tabIndex={0}
+              style={zoomMode === 'fit' ? undefined : {
+                '--question-width': `calc(100% - ${geometry.pageWidth * PAGE_PX_PER_MM * scale + 44}px)`,
+              } as React.CSSProperties}>
               <h2>题干</h2>
               <p>{question.prompt}</p>
               {question.materials && (
