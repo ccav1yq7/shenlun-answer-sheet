@@ -14,8 +14,8 @@ import type { EditorSurfaceHandle } from './components/EditorSurface'
 import { SheetView } from './components/SheetView'
 import type { ReadingMark } from './components/AnnotatedText'
 import { PracticeDialog } from './components/PracticeDialog'
-import { readPracticeDefaults, writePractice, writePracticeDefaults } from './document/practiceStore'
-import type { PracticePreferences, PracticeSnapshot, SavedPractice } from './document/practiceStore'
+import { readPracticeDefaults, storePractice, writePracticeDefaults } from './document/practiceStore'
+import type { DirectoryHandle, PracticeEntry, PracticePreferences, PracticeSnapshot, SavedPractice } from './document/practiceStore'
 import { QuestionPane } from './components/QuestionPane'
 import { QuestionImport } from './components/QuestionImport'
 import type { ImportedQuestion } from './components/QuestionImport'
@@ -87,7 +87,7 @@ export default function App() {
   })
   const [practiceDialog, setPracticeDialog] = useState<'save' | 'list' | null>(() =>
     new URLSearchParams(window.location.search).get('practice') === '1' ? 'list' : null)
-  const [currentPractice, setCurrentPractice] = useState<SavedPractice | null>(null)
+  const [currentPractice, setCurrentPractice] = useState<PracticeEntry | null>(null)
   const [activeBlockId, setActiveBlockId] = useState<string>(() => sheet.blocks[0].id)
   const [marks, setMarks] = useState<ReadingMark[]>([])
   const [question, setQuestion] = useState<ImportedQuestion | null>(null)
@@ -304,25 +304,23 @@ export default function App() {
     }
   }
 
-  function savePractice(name: string, asCopy: boolean) {
-    try {
-      const record = {
-        id: asCopy ? crypto.randomUUID() : currentPractice?.id ?? crypto.randomUUID(),
-        name,
-        updatedAt: new Date().toISOString(),
-        snapshot: practiceSnapshot(),
-      }
-      writePractice(record)
-      setCurrentPractice(record)
-      setPracticeDialog(null)
-      showToast('练习已保存到当前浏览器')
-      return true
-    } catch {
-      return false
+  async function savePractice(name: string, status: NonNullable<SavedPractice['status']>, asCopy: boolean, directory?: DirectoryHandle) {
+    const existing = asCopy ? null : currentPractice
+    const record: PracticeEntry = {
+      id: existing?.id ?? crypto.randomUUID(),
+      name,
+      status,
+      storage: existing?.storage ?? (directory ? 'folder' : 'browser'),
+      updatedAt: new Date().toISOString(),
+      snapshot: practiceSnapshot(),
     }
+    await storePractice(record, directory, existing ?? undefined)
+    setCurrentPractice(record)
+    setPracticeDialog(null)
+    showToast(record.storage === 'folder' ? '练习已保存到本地文件夹' : '练习已保存到当前浏览器')
   }
 
-  function openPractice(record: SavedPractice) {
+  function openPractice(record: PracticeEntry) {
     const current = practiceSnapshot()
     const hasWork = question || marks.length || sheet.blocks.some((block) => block.text.trim())
     if (hasWork && JSON.stringify(current) !== JSON.stringify(currentPractice?.snapshot)
@@ -1130,8 +1128,14 @@ export default function App() {
           {practiceDialog && (
             <PracticeDialog mode={practiceDialog}
               name={currentPractice?.name ?? question?.paper?.title ?? '申论练习'}
-              canUpdate={currentPractice !== null}
-              onSave={savePractice} onOpen={openPractice} onClose={() => setPracticeDialog(null)} />
+              current={currentPractice}
+              onSave={savePractice} onOpen={openPractice}
+              onUpdate={(previous, updated) => {
+                if (currentPractice?.id === previous.id && currentPractice.storage === previous.storage) {
+                  setCurrentPractice(updated)
+                }
+              }}
+              onClose={() => setPracticeDialog(null)} />
           )}
           {importingQuestion && (
             <QuestionImport

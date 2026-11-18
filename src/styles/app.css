@@ -802,3 +802,54 @@ select:focus-visible,
   display: block;
   margin-top: 3px;
 }
+
+.practice-dialog {
+  width: min(820px, calc(100% - 24px));
+}
+
+.practice-storage,
+.practice-list-toolbar,
+.practice-actions,
+.practice-filter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.practice-storage,
+.practice-list-toolbar {
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.practice-storage {
+  padding: 10px 12px;
+  background: #f2f5fc;
+  border-radius: 8px;
+}
+
+.practice-storage small {
+  display: block;
+  color: var(--text-dim);
+}
+
+.practice-filter {
+  margin: 8px 0;
+}
+
+.practice-record {
+  min-width: 0;
+}
+
+.practice-record code {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.practice-delete {
+  color: #a32b21;
+}
