@@ -492,6 +492,16 @@ export default function App() {
     }
   }, [sheet, showToast])
 
+  const handleExportGridDocx = useCallback(async () => {
+    try {
+      const { exportGridDocx } = await import('./export/exportGridDocx')
+      await exportGridDocx(doc, geometry)
+      showToast('已导出方格 Word')
+    } catch (error) {
+      showToast(`导出方格 Word 失败：${error instanceof Error ? error.message : String(error)}`)
+    }
+  }, [doc, geometry, showToast])
+
   const handleExportPdf = useCallback(async () => {
     const container = printRef.current
     const fallbackToPrint = async (reason: string) => {
@@ -749,7 +759,10 @@ export default function App() {
               </button>
             )}
             <button type="button" className="btn btn--primary" onClick={handleExportDocx}>
-              导出 Word
+              导出文字 Word
+            </button>
+            <button type="button" className="btn btn--primary" onClick={handleExportGridDocx}>
+              导出方格 Word
             </button>
             <button type="button" className="btn btn--primary" onClick={handleExportPdf}>
               导出 PDF
