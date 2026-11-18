@@ -17,5 +17,10 @@ Copyright (c) 2026 Murphy
          但要求保留版权声明与许可证全文，且不得单独出售字体本身。
          本项目的 MIT 许可证不覆盖该字体文件；字体部分以 OFL 为准。
 
-2. 其余运行时依赖（React / pdf-lib / docx 等）均为 MIT 或同等宽松许可，
+2. PDF.js
+   用途：在浏览器中读取粉笔 PDF 的文字层。
+   来源：https://github.com/mozilla/pdf.js
+   许可：Apache License 2.0，全文见 LICENSES/Apache-2.0-PDF.js.txt。
+
+3. 其余运行时依赖（React / pdf-lib / docx 等）均为 MIT 或同等宽松许可，
    其版权归各自作者所有，详见 package.json 与 node_modules 内各包的 LICENSE。

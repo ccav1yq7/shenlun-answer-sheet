@@ -26,8 +26,9 @@ const NOTICE_DIRS = ['LICENSES']
 
 function singleFileNotice(): string {
   const notice = readFileSync(join(ROOT, 'NOTICE'), 'utf-8').trim()
-  const ofl = readFileSync(join(ROOT, 'LICENSES', 'OFL-NotoSerifSC.txt'), 'utf-8').trim()
-  return [`<!--`, notice, '', '-'.repeat(74), '', ofl, `-->`].join('\n')
+  const licenses = readdirSync(join(ROOT, 'LICENSES')).sort()
+    .map((file) => readFileSync(join(ROOT, 'LICENSES', file), 'utf-8').trim())
+  return `<!--\n${[notice, ...licenses].join(`\n\n${'-'.repeat(74)}\n\n`)}\n-->`
 }
 
 export interface BundleLicensesOptions {

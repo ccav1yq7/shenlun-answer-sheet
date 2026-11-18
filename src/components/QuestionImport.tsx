@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import type { FenbiPaper } from '../import/fenbiPdf'
 
 export interface ImportedQuestion {
   materials: string
@@ -17,6 +18,8 @@ export function QuestionImport({ question, onSave, onClose }: QuestionImportProp
   const [draft, setDraft] = useState<ImportedQuestion>(question ?? { materials: '', prompt: '' })
   const [reading, setReading] = useState(false)
   const [error, setError] = useState('')
+  const [paper, setPaper] = useState<FenbiPaper | null>(null)
+  const [questionIndex, setQuestionIndex] = useState(0)
 
   useEffect(() => {
     dialogRef.current?.showModal()
@@ -36,6 +39,24 @@ export function QuestionImport({ question, onSave, onClose }: QuestionImportProp
     }
   }
 
+  async function readPdf(file?: File) {
+    if (!file) return
+    setReading(true)
+    setError('')
+    try {
+      const { importFenbiPdf } = await import('../import/fenbiPdf')
+      const parsed = await importFenbiPdf(file)
+      setPaper(parsed)
+      setQuestionIndex(0)
+      setDraft({ materials: parsed.materials, prompt: `${parsed.questions[0].label}\n${parsed.questions[0].prompt}` })
+    } catch (error) {
+      setError(error instanceof Error && /[\u4e00-\u9fff]/.test(error.message)
+        ? error.message : '无法读取 PDF，请确认文件能正常打开且没有密码。')
+    } finally {
+      setReading(false)
+    }
+  }
+
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (reading || !draft.prompt.trim()) return
@@ -46,6 +67,29 @@ export function QuestionImport({ question, onSave, onClose }: QuestionImportProp
     <dialog className="question-import" ref={dialogRef} onClose={onClose} aria-labelledby="question-import-title">
       <form onSubmit={save}>
         <h2 id="question-import-title">{question ? '编辑题目' : '导入题目'}</h2>
+        <div className="question-import-field">
+          <label className="question-file">
+            上传粉笔 PDF
+            <input type="file" accept=".pdf,application/pdf" disabled={reading} onChange={(event) => {
+              void readPdf(event.target.files?.[0])
+              event.target.value = ''
+            }} />
+          </label>
+          {reading && <span role="status">正在读取文件…</span>}
+          {paper && (
+            <label className="question-file">
+              选择题目
+              <select value={questionIndex} disabled={reading} onChange={(event) => {
+                const index = Number(event.target.value)
+                const selected = paper.questions[index]
+                setQuestionIndex(index)
+                setDraft((current) => ({ ...current, prompt: `${selected.label}\n${selected.prompt}` }))
+              }}>
+                {paper.questions.map((item, index) => <option key={index} value={index}>{item.label}</option>)}
+              </select>
+            </label>
+          )}
+        </div>
         {(['materials', 'prompt'] as const).map((field) => {
           const label = field === 'materials' ? '材料' : '题干'
           return (
