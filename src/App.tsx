@@ -74,6 +74,30 @@ export default function App() {
   const [autoScale, setAutoScale] = useState(1)
   const [toast, setToast] = useState<string | null>(null)
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.hash.slice(1))
+    const payload = params.get('fenbi-question')
+    if (payload === null) return
+    params.delete('fenbi-question')
+    const hash = params.toString()
+    window.history.replaceState(null, '', window.location.pathname + window.location.search + (hash ? `#${hash}` : ''))
+    try {
+      const data = JSON.parse(payload)
+      if (typeof data?.prompt !== 'string' || !data.prompt.trim() || typeof data.materials !== 'string') {
+        throw new Error('invalid question')
+      }
+      setQuestion({ prompt: data.prompt, materials: data.materials })
+      if (Number.isInteger(data.capacity) && data.capacity > 0 && data.capacity <= 10000) {
+        setSheet((current) => ({
+          ...current,
+          blocks: current.blocks.map((block) => ({ ...block, capacity: data.capacity })),
+        }))
+      }
+    } catch {
+      setImportingQuestion(true)
+    }
+  }, [])
+
   const sheetRef = useRef(sheet)
   sheetRef.current = sheet
   const selectionRef = useRef(selection)
