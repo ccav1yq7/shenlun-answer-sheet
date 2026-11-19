@@ -1074,7 +1074,9 @@ export default function App() {
           {question && showQuestion && (
             <QuestionPane question={question} onQuestionChange={selectImportedQuestion}
               zoomOffset={zoomOffset} widthPercent={readerWidth} onWidthChange={setReaderWidth}
-              marks={marks} presets={markPresets} onSaveMark={(mark) => setMarks((current) => [...current.filter((item) => item.id !== mark.id), mark])}
+              marks={marks} presets={markPresets} onSaveMark={(mark) => setMarks((current) => current.some((item) => item.id === mark.id)
+                ? current.map((item) => item.id === mark.id ? mark : item)
+                : [...current, mark])}
               onRemoveMark={(id) => setMarks((current) => current.filter((mark) => mark.id !== id))} />
           )}
           <div className="sheet-viewport" ref={viewportRef}>

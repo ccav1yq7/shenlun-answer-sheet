@@ -44,12 +44,23 @@ export function AnnotatedText({ text, source, label, heading, marks, presets, on
   const [note, setNote] = useState('')
   const [message, setMessage] = useState('')
   const ownMarks = marks.filter((mark) => mark.source === source)
-  const anchored = ownMarks.flatMap((mark) => {
+  const activeMark = overlay?.type === 'note' || overlay?.type === 'edit' ? overlay.mark : null
+  const draftMark = activeMark && overlay?.type === 'edit' && !ownMarks.some((mark) => mark.id === activeMark.id)
+    ? activeMark : null
+  const visibleMarks = draftMark ? [...ownMarks, draftMark] : ownMarks
+  const noteNumbers = new Map((draftMark ? [...marks, draftMark] : marks)
+    .filter((mark) => mark.note || (overlay?.type === 'edit' && mark.id === activeMark?.id))
+    .map((mark, index) => [mark.id, index + 1]))
+  const activePreset = validMarkPreset(activeMark?.preset) ? activeMark.preset : defaultMarkPresets[0]
+  const activeNumber = activeMark ? noteNumbers.get(activeMark.id) : undefined
+  const anchored = visibleMarks.flatMap((mark) => {
     if (text.slice(mark.start, mark.end) === mark.quote) return [mark]
     const start = text.indexOf(mark.quote)
     return start >= 0 && start === text.lastIndexOf(mark.quote)
       ? [{ ...mark, start, end: start + mark.quote.length }] : []
   }).sort((a, b) => a.start - b.start)
+
+  const activeSourceExists = activeMark && anchored.some((mark) => mark.id === activeMark.id)
 
   function readSelection() {
     const root = passage.current
@@ -93,8 +104,9 @@ export function AnnotatedText({ text, source, label, heading, marks, presets, on
   function saveNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (overlay?.type !== 'edit' || !note.trim()) return
-    onSave({ ...overlay.mark, note: { kind, text: note.trim() } })
-    close()
+    const mark = { ...overlay.mark, note: { kind, text: note.trim() } }
+    onSave(mark)
+    setOverlay({ ...overlay, type: 'note', mark })
   }
 
   const fragments: ReactNode[] = []
@@ -102,14 +114,16 @@ export function AnnotatedText({ text, source, label, heading, marks, presets, on
   for (const mark of anchored) {
     if (mark.start < cursor) continue
     const preset = validMarkPreset(mark.preset) ? mark.preset : defaultMarkPresets[0]
+    const number = noteNumbers.get(mark.id)
+    const active = activeMark?.id === mark.id
     fragments.push(text.slice(cursor, mark.start))
     fragments.push(
       <mark key={mark.id} ref={(element) => {
         if (element) markElements.current.set(mark.id, element)
         else markElements.current.delete(mark.id)
-      }} className={`reading-mark mark-${preset.style}${mark.note ? ' reading-mark--note' : ''}`}
-        data-meaning={preset.label} style={{ '--mark-color': preset.color } as CSSProperties}
-        tabIndex={0} role="button" aria-label={`${mark.note ? '查看批注' : '查看标记'}：${mark.quote}`}
+      }} className={`reading-mark mark-${preset.style}${number ? ' reading-mark--note' : ''}${active ? ' reading-mark--active' : ''}`}
+        data-meaning={preset.label} data-note-number={number} style={{ '--mark-color': preset.color } as CSSProperties}
+        tabIndex={0} role="button" aria-expanded={active} aria-label={`${mark.note ? '查看批注' : '查看标记'}：${mark.quote}`}
         onClick={(event) => {
           if (window.getSelection()?.isCollapsed) setOverlay({ type: 'note', anchor: event.currentTarget, mark })
         }}
@@ -134,6 +148,10 @@ export function AnnotatedText({ text, source, label, heading, marks, presets, on
       onMouseUp={readSelection} onKeyUp={readSelection} onTouchEnd={readSelection}>{fragments}</p>
     {overlay && <ReadingPopover anchor={overlay.anchor} onClose={close}
       compact={overlay.type === 'selection'}
+      connection={activeMark && activeSourceExists ? {
+        color: activePreset.color,
+        resolveSource: () => markElements.current.get(activeMark.id),
+      } : undefined}
       label={overlay.type === 'selection' ? '选中文字操作' : overlay.type === 'index' ? '本节标记与批注' : '原文批注'}>
       {overlay.type === 'selection' && <>
         <div className="reading-preset-palette">
@@ -161,7 +179,10 @@ export function AnnotatedText({ text, source, label, heading, marks, presets, on
       </>}
       {overlay.type === 'edit' && <form className="reading-note-editor" onSubmit={saveNote}>
         <div className="reading-card-header">
-          <strong>{overlay.mark.note ? '编辑批注' : '新建批注'}</strong>
+          <div className="reading-card-title">
+            {activeNumber && <span className="reading-number">{activeNumber}</span>}
+            <strong>{overlay.mark.note ? '编辑批注' : '新建批注'}</strong>
+          </div>
           <button type="button" className="reading-icon-button" aria-label="关闭批注" onClick={close}>×</button>
         </div>
         <blockquote>{overlay.mark.quote}</blockquote>
@@ -177,11 +198,22 @@ export function AnnotatedText({ text, source, label, heading, marks, presets, on
       </form>}
       {overlay.type === 'note' && <>
         <div className="reading-card-header">
-          <strong>{overlay.mark.note?.kind ?? '原文标记'}</strong>
-          <button type="button" className="reading-icon-button" aria-label="关闭批注" onClick={close}>×</button>
+          <div className="reading-card-title">
+            {activeNumber && <span className="reading-number">{activeNumber}</span>}
+            <strong>{overlay.mark.note?.kind ?? '原文标记'}</strong>
+          </div>
+          <div className="reading-card-title">
+            {activeSourceExists && <button type="button" className="reading-icon-button"
+              onClick={() => markElements.current.get(overlay.mark.id)?.scrollIntoView({ block: 'nearest' })}>定位原文</button>}
+            <button type="button" className="reading-icon-button" aria-label="关闭批注" onClick={close}>×</button>
+          </div>
         </div>
         <blockquote>{overlay.mark.quote}</blockquote>
-        {overlay.mark.note && <p className="reading-note-body">{overlay.mark.note.text}</p>}
+        {!activeSourceExists && <p className="reading-message">这段摘录在当前正文中已找不到。</p>}
+        {overlay.mark.note && <div className="reading-annotation">
+          <span>批注</span>
+          <p className="reading-note-body">{overlay.mark.note.text}</p>
+        </div>}
         <div className="reading-card-actions">
           <label>标记样式
             <select value={overlay.mark.preset?.id ?? ''} onChange={(event) => {
@@ -220,7 +252,13 @@ export function AnnotatedText({ text, source, label, heading, marks, presets, on
               anchor?.scrollIntoView({ block: 'nearest' })
               setOverlay({ type: 'note', anchor: anchor ?? overlay.anchor, mark })
             }}>
-              <span>{mark.note?.kind ?? mark.preset?.label ?? '标记'}</span>
+              <span className="reading-card-title">
+                {noteNumbers.has(mark.id) && <span className="reading-number"
+                  style={{ '--mark-color': mark.preset?.color ?? defaultMarkPresets[0].color } as CSSProperties}>
+                  {noteNumbers.get(mark.id)}
+                </span>}
+                {mark.note?.kind ?? mark.preset?.label ?? '标记'}
+              </span>
               <q>{mark.quote}</q>
               {mark.note && <b>{mark.note.text}</b>}
             </button>
