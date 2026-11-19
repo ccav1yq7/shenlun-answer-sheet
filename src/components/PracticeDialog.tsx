@@ -13,7 +13,7 @@ interface PracticeDialogProps {
   name: string
   current: PracticeEntry | null
   onSave: (name: string, status: Status, asCopy: boolean, directory?: DirectoryHandle) => Promise<void>
-  onOpen: (practice: PracticeEntry) => void
+  onOpen: (practice: PracticeEntry, directory?: DirectoryHandle) => void
   onUpdate: (previous: PracticeEntry, updated: PracticeEntry | null) => void
   onClose: () => void
 }
@@ -138,7 +138,7 @@ export function PracticeDialog({ mode, name, current, onSave, onOpen, onUpdate, 
             </select>
           </label>
           <p className="practice-hint">{current ? `保存会更新原记录（${current.storage === 'folder' ? '本地文件' : '浏览器'}），另存一份可使用当前存储位置。`
-            : '保存内容包括材料、题干、各题答案和笔记。'}</p>
+            : '保存内容包括材料、题干、各题答案和笔记。首次保存后，后续修改会自动保存。'}</p>
           <div className="question-import-actions">
             <button type="button" className="btn" onClick={() => dialog.current?.close()}>取消</button>
             {current && <button type="button" className="btn" disabled={loading || !draft.trim()}
@@ -180,7 +180,7 @@ export function PracticeDialog({ mode, name, current, onSave, onOpen, onUpdate, 
                 </div>
                 <div className="practice-actions">
                   <button type="button" className="btn" disabled={loading} aria-label={`打开 ${practice.name}`}
-                    onClick={() => void run(async () => onOpen(await reloadPractice(practice, directory)))}>打开</button>
+                    onClick={() => void run(async () => onOpen(await reloadPractice(practice, directory), directory))}>打开</button>
                   <button type="button" className="btn" disabled={loading} onClick={() => setEditing({ record: practice, name: practice.name })}>重命名</button>
                   <button type="button" className="btn" disabled={loading} onClick={() => void run(() => update(practice, {
                     status: practice.status === 'completed' ? 'in-progress' : 'completed',

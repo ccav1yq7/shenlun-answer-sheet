@@ -1011,3 +1011,15 @@ select:focus-visible,
 .practice-delete {
   color: #a32b21;
 }
+
+
+.practice-autosave {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #35654b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.practice-autosave--failed { color: #9a3412; }

@@ -90,6 +90,11 @@ export default function App() {
   const [practiceDialog, setPracticeDialog] = useState<'save' | 'list' | null>(() =>
     new URLSearchParams(window.location.search).get('practice') === '1' ? 'list' : null)
   const [currentPractice, setCurrentPractice] = useState<PracticeEntry | null>(null)
+  const practiceDirectory = useRef<DirectoryHandle>()
+  const saveJob = useRef<Promise<void> | null>(null)
+  const previousAutosave = useRef<PracticeEntry>()
+  const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'failed'>('idle')
+  const [autosaveError, setAutosaveError] = useState('')
   const [activeBlockId, setActiveBlockId] = useState<string>(() => sheet.blocks[0].id)
   const [markPresets, setMarkPresets] = useState(readMarkPresets)
   const [showMarkSettings, setShowMarkSettings] = useState(false)
@@ -280,7 +285,7 @@ export default function App() {
     setQuestion({ ...question, questionIndex: index, prompt: `${selected.label}\n${selected.prompt}` })
   }
 
-  function practicePreferences(capacity: number): PracticePreferences {
+  const practicePreferences = useCallback((capacity: number): PracticePreferences => {
     return {
       capacity,
       columns: sheet.columns,
@@ -292,20 +297,71 @@ export default function App() {
       exportContent,
       keepExportFormat,
     }
-  }
+  }, [sheet.columns, sheet.profileKey, sheet.showTemplate, readerWidth, zoomMode, exportContent, keepExportFormat])
 
-  function practiceSnapshot(): PracticeSnapshot {
-    return {
-      sheet,
-      activeBlockId,
-      question,
-      marks,
-      showQuestion,
-      preferences: practicePreferences(activeCapacity),
-      otherAnswers: [...questionAnswers.current.entries()]
-        .filter(([index]) => index !== (question?.questionIndex ?? 0))
-        .sort(([a], [b]) => a - b),
+  const snapshot = useMemo((): PracticeSnapshot => ({
+    sheet,
+    activeBlockId,
+    question,
+    marks,
+    showQuestion,
+    preferences: practicePreferences(activeCapacity),
+    otherAnswers: [...questionAnswers.current.entries()]
+      .filter(([index]) => index !== (question?.questionIndex ?? 0))
+      .sort(([a], [b]) => a - b),
+  }), [sheet, activeBlockId, question, marks, showQuestion, practicePreferences, activeCapacity])
+
+  const unsaved = useMemo(() => currentPractice !== null
+    && JSON.stringify(snapshot) !== JSON.stringify(currentPractice.snapshot), [snapshot, currentPractice])
+
+  const flushAutosave = useCallback((record: PracticeEntry, pending: PracticeSnapshot) => {
+    if (saveJob.current || previousAutosave.current === record) return saveJob.current
+    const updated = { ...record, snapshot: pending, updatedAt: new Date().toISOString() }
+    const directory = practiceDirectory.current
+    setAutosaveState('saving')
+    const job = (async () => {
+      try {
+        await storePractice(updated, directory, record)
+        previousAutosave.current = record
+        setCurrentPractice((current) => current === record ? updated : current)
+        setAutosaveState('idle')
+        setAutosaveError('')
+      } catch (error) {
+        setAutosaveState('failed')
+        setAutosaveError(error instanceof Error ? error.message : '无法写入练习记录')
+      } finally {
+        saveJob.current = null
+      }
+    })()
+    saveJob.current = job
+    return job
+  }, [])
+
+  useEffect(() => {
+    if (!currentPractice || !unsaved || practiceDialog) return
+    const save = () => void flushAutosave(currentPractice, snapshot)
+    const timer = window.setTimeout(save, 650)
+    const visibility = () => { if (document.visibilityState === 'hidden') save() }
+    document.addEventListener('visibilitychange', visibility)
+    return () => {
+      window.clearTimeout(timer)
+      document.removeEventListener('visibilitychange', visibility)
     }
+  }, [currentPractice, unsaved, snapshot, practiceDialog, flushAutosave])
+
+  useEffect(() => {
+    if (!unsaved) return
+    const protect = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', protect)
+    return () => window.removeEventListener('beforeunload', protect)
+  }, [unsaved])
+
+  async function showPracticeDialog(mode: 'save' | 'list') {
+    if (saveJob.current) await saveJob.current
+    setPracticeDialog(mode)
   }
 
   async function savePractice(name: string, status: NonNullable<SavedPractice['status']>, asCopy: boolean, directory?: DirectoryHandle) {
@@ -316,18 +372,20 @@ export default function App() {
       status,
       storage: existing?.storage ?? (directory ? 'folder' : 'browser'),
       updatedAt: new Date().toISOString(),
-      snapshot: practiceSnapshot(),
+      snapshot,
     }
     await storePractice(record, directory, existing ?? undefined)
+    practiceDirectory.current = record.storage === 'folder' ? directory : undefined
     setCurrentPractice(record)
+    setAutosaveState('idle')
+    setAutosaveError('')
     setPracticeDialog(null)
     showToast(record.storage === 'folder' ? '练习已保存到本地文件夹' : '练习已保存到当前浏览器')
   }
 
-  function openPractice(record: PracticeEntry) {
-    const current = practiceSnapshot()
+  function openPractice(record: PracticeEntry, directory?: DirectoryHandle) {
     const hasWork = question || marks.length || sheet.blocks.some((block) => block.text.trim())
-    if (hasWork && JSON.stringify(current) !== JSON.stringify(currentPractice?.snapshot)
+    if (hasWork && (!currentPractice || unsaved)
       && !window.confirm('当前练习有未保存的内容。继续打开已保存的练习吗？')) return
     const saved = record.snapshot
     const block = saved.sheet.blocks.find((item) => item.id === saved.activeBlockId) ?? saved.sheet.blocks[0]
@@ -347,6 +405,9 @@ export default function App() {
     zoomBase.current = saved.preferences.zoomBase
     setExportContent(saved.preferences.exportContent)
     setKeepExportFormat(saved.preferences.keepExportFormat)
+    practiceDirectory.current = record.storage === 'folder' ? directory : undefined
+    setAutosaveState('idle')
+    setAutosaveError('')
     setCurrentPractice(record)
     setPracticeDialog(null)
     showToast('已打开「' + record.name + '」')
@@ -832,8 +893,19 @@ export default function App() {
               </button>
             )}
             <span className="toolbar-sep" />
-            <button type="button" className="btn" onClick={() => setPracticeDialog('save')}>保存练习</button>
-            <button type="button" className="btn" onClick={() => setPracticeDialog('list')}>我的练习</button>
+            <button type="button" className="btn" onClick={() => void showPracticeDialog('save')}>保存练习</button>
+            <button type="button" className="btn" onClick={() => void showPracticeDialog('list')}>我的练习</button>
+            {currentPractice && (
+              <span className={`practice-autosave${autosaveState === 'failed' && unsaved ? ' practice-autosave--failed' : ''}`}>
+                <span role="status" title={autosaveError || undefined}>
+                  {autosaveState === 'failed' && unsaved ? `自动保存失败：${autosaveError}`
+                    : unsaved || autosaveState === 'saving' ? '正在自动保存…' : '已自动保存'}
+                </span>
+                {autosaveState === 'failed' && unsaved && (
+                  <button type="button" className="btn" onClick={() => void flushAutosave(currentPractice, snapshot)}>重试</button>
+                )}
+              </span>
+            )}
             <button type="button" className="btn" onClick={saveDefaults}
               title="保存当前字数、列数、版式、缩放、阅读栏宽度和导出选项">保存为默认设置</button>
             <span className="toolbar-sep" />
@@ -1158,10 +1230,8 @@ export default function App() {
                   selectImportedQuestion(imported.questionIndex ?? 0)
                 } else if (!samePaper) {
                   questionAnswers.current.clear()
-                  if (imported.paper || !question) {
-                    setMarks([])
-                    setCurrentPractice(null)
-                  }
+                  if (imported.paper || !question) setMarks([])
+                  if (imported.paper && question) setCurrentPractice(null)
                   const selected = imported.paper?.questions[imported.questionIndex ?? 0]
                   if (selected) updateBlock(activeBlock.id, {
                     capacity: questionCapacity(selected.prompt),
