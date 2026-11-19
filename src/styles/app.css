@@ -657,6 +657,13 @@ select:focus-visible,
 }
 .mark-double { text-decoration-style: double; }
 .mark-wave { text-decoration-style: wavy; }
+.reading-transition-symbol::before {
+  content: '//';
+  margin-inline-end: .24em;
+  color: var(--mark-color);
+  font-weight: 750;
+  white-space: nowrap;
+}
 .mark-strike { text-decoration: line-through var(--mark-color) 2px; }
 
 .reading-mark--note { margin-inline-end: 1.2em; }

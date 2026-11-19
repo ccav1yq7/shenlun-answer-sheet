@@ -7,6 +7,7 @@ export const markStyles = {
   wave: '波浪线',
   circle: '圈选',
   strike: '删除线',
+  transition: '转换符号 //',
 } as const
 
 export interface MarkPreset {
@@ -16,11 +17,14 @@ export interface MarkPreset {
   style: keyof typeof markStyles
 }
 
+const transitionPreset: MarkPreset = { id: 'transition', label: '转换', color: '#3f6aab', style: 'transition' }
+
 export const defaultMarkPresets: MarkPreset[] = [
   { id: 'keyword', label: '关键词', color: '#e5a526', style: 'highlight' },
   { id: 'point', label: '要点', color: '#3975da', style: 'underline' },
   { id: 'cause', label: '因果', color: '#a44ab5', style: 'circle' },
   { id: 'rewrite', label: '待改写', color: '#258d75', style: 'wave' },
+  transitionPreset,
 ]
 
 export function validMarkPreset(value: unknown): value is MarkPreset {
@@ -31,13 +35,15 @@ export function validMarkPreset(value: unknown): value is MarkPreset {
     && typeof preset.style === 'string' && Object.prototype.hasOwnProperty.call(markStyles, preset.style)
 }
 
-const storageKey = 'shenlun-mark-presets-v1'
+const storageKey = 'shenlun-mark-presets-v2'
 
 export function readMarkPresets(): MarkPreset[] {
   try {
-    const stored: unknown = JSON.parse(localStorage.getItem(storageKey) ?? 'null')
+    const current = localStorage.getItem(storageKey)
+    const saved = current ?? localStorage.getItem('shenlun-mark-presets-v1')
+    const stored: unknown = JSON.parse(saved ?? 'null')
     if (Array.isArray(stored) && stored.length > 0 && stored.every(validMarkPreset)) {
-      return stored
+      return current || stored.some((preset) => preset.id === transitionPreset.id) ? stored : [...stored, transitionPreset]
     }
   } catch {
     // A browser may disable storage.

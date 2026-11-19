@@ -132,7 +132,7 @@ export function AnnotatedText({ text, source, label, heading, marks, presets, on
             event.preventDefault()
             setOverlay({ type: 'note', anchor: event.currentTarget, mark })
           }
-        }}>{mark.quote}</mark>,
+        }}>{preset.style === 'transition' && <span className="reading-transition-symbol" aria-hidden="true" />}{mark.quote}</mark>,
     )
     cursor = mark.end
   }
@@ -167,7 +167,7 @@ export function AnnotatedText({ text, source, label, heading, marks, presets, on
                 }
               }}>
               <span className={`reading-mark mark-${preset.style}`}
-                style={{ '--mark-color': preset.color } as CSSProperties}>{preset.label}</span>
+                style={{ '--mark-color': preset.color } as CSSProperties}>{preset.style === 'transition' && <span className="reading-transition-symbol" aria-hidden="true" />}{preset.label}</span>
             </button>
           ))}
         </div>
