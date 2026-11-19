@@ -13,8 +13,9 @@ import { EditorSurface } from './components/EditorSurface'
 import type { EditorSurfaceHandle } from './components/EditorSurface'
 import { SheetView } from './components/SheetView'
 import { MarkPresetDialog } from './components/MarkPresetDialog'
-import { readMarkPresets } from './document/readingMarks'
+import { readMarkPresets, syncMarkPresets } from './document/readingMarks'
 import type { ReadingMark } from './components/AnnotatedText'
+import { AnswerCardDialog } from './components/AnswerCardDialog'
 import { PracticeDialog } from './components/PracticeDialog'
 import { readPracticeDefaults, storePractice, writePracticeDefaults } from './document/practiceStore'
 import type { DirectoryHandle, PracticeEntry, PracticePreferences, PracticeSnapshot, SavedPractice } from './document/practiceStore'
@@ -24,13 +25,15 @@ import type { ImportedQuestion } from './components/QuestionImport'
 import {
   CAPACITY_PRESETS,
   COLUMN_OPTIONS,
+  activeAnswerCard,
   appendBlock,
   blockToPlainText,
+  createBlock,
   createSheet,
   reconcileParagraphStyles,
   sheetToPlainText,
 } from './document/model'
-import type { AnswerBlock, AnswerSheet, ParagraphStyle } from './document/model'
+import type { AnswerBlock, AnswerCardDetails, AnswerSheet, ArchivedAnswerCard, ParagraphStyle } from './document/model'
 import { includeQuestion, questionBlocks, readingNotesBlock } from './export/questionContent'
 import { buildPrintHtml, exportPdfViaPrint } from './export/exportPdf'
 import { describeUnsupportedChars, findUnsupportedChars } from './export/pdfFontCharset'
@@ -147,6 +150,8 @@ export default function App() {
   const [exportContent, setExportContent] = useState(defaults.exportContent ?? { prompt: true, materials: true, notes: false, answer: true })
   const [keepExportFormat, setKeepExportFormat] = useState(defaults.keepExportFormat ?? true)
   const [exporting, setExporting] = useState(false)
+  const [cardDialog, setCardDialog] = useState<'add' | 'edit' | null>(null)
+  const reviewRef = useRef<HTMLTextAreaElement>(null)
   const exportSourceRef = useRef<HTMLDivElement | null>(null)
   const printRef = useRef<HTMLDivElement | null>(null)
   const viewportRef = useRef<HTMLDivElement | null>(null)
@@ -394,7 +399,7 @@ export default function App() {
     setSelection({ start: 0, end: 0 })
     editorRef.current?.setValue(block.text, 0)
     setQuestion(saved.question)
-    setMarks(saved.marks)
+    setMarks(syncMarkPresets(saved.marks, markPresets))
     setShowQuestion(saved.showQuestion)
     questionAnswers.current = new Map(saved.otherAnswers)
     undoStack.current = []
@@ -602,6 +607,38 @@ export default function App() {
     }))
   }, [])
 
+  const currentCard = activeAnswerCard(activeBlock)
+  const otherCards = activeBlock.otherCards ?? []
+
+  function swapAnswerCard(card: ArchivedAnswerCard, remaining: ArchivedAnswerCard[]) {
+    const { text, paragraphStyles, indentFirstLine, ...details } = card
+    const archive = {
+      ...currentCard, text: activeBlock.text,
+      paragraphStyles: activeBlock.paragraphStyles, indentFirstLine: activeBlock.indentFirstLine,
+    }
+    updateBlock(activeBlock.id, { text, paragraphStyles, indentFirstLine, card: details, otherCards: [...remaining, archive] })
+    undoStack.current = []
+    redoStack.current = []
+    lastPush.current = { time: 0, blockId: '' }
+    setSelection({ start: 0, end: 0 })
+    editorRef.current?.setValue(text, 0)
+  }
+
+  function saveAnswerCard(details: AnswerCardDetails) {
+    if (cardDialog === 'add') {
+      swapAnswerCard({
+        ...details,
+        id: crypto.randomUUID(),
+        text: '',
+        paragraphStyles: [{ kind: 'normal', align: 'left', indentCells: activeBlock.indentFirstLine ? 2 : 0 }],
+        indentFirstLine: activeBlock.indentFirstLine,
+      }, otherCards)
+    } else {
+      updateBlock(activeBlock.id, { card: details })
+    }
+    setCardDialog(null)
+  }
+
   const handleCapacity = useCallback(
     (capacity: number) => {
       const value = Math.max(1, Math.min(20000, Math.floor(capacity)))
@@ -762,6 +799,9 @@ export default function App() {
     if (exporting) return
     const frontBlocks = questionBlocks(question, exportContent)
     if (exportContent.notes && activeMarks.length) frontBlocks.push(readingNotesBlock(activeMarks))
+    if (exportContent.review && currentCard.review.trim()) {
+      frontBlocks.push({ ...createBlock('复盘笔记', 0, false), text: currentCard.review })
+    }
     const frontMatter = frontBlocks.length ? { ...sheet, blocks: frontBlocks } : undefined
     const exportSheet = {
       ...sheet,
@@ -778,7 +818,7 @@ export default function App() {
       if (format === 'Word') {
         if (withGrid) {
           const { exportGridDocx } = await import('./export/exportGridDocx')
-          await exportGridDocx(doc, geometry, frontMatter)
+          await exportGridDocx(doc, geometry, frontMatter, activeBlock.card)
         } else {
           const { exportDocx } = await import('./export/exportDocx')
           await exportDocx(exportSheet, { keepIndent: false, title })
@@ -1064,10 +1104,11 @@ export default function App() {
                   ['prompt', '题干', Boolean(question?.prompt)],
                   ['materials', '材料', Boolean(question?.materials)],
                   ['notes', '标记与笔记', activeMarks.length > 0],
+                  ['review', '复盘笔记', Boolean(currentCard.review.trim())],
                   ['answer', '作答', true],
                 ] as const).map(([key, label, available]) => (
                   <label key={key}>
-                    <input type="checkbox" checked={available && exportContent[key]} disabled={exporting || !available}
+                    <input type="checkbox" checked={available && Boolean(exportContent[key])} disabled={exporting || !available}
                       onChange={(event) => {
                         const checked = event.target.checked
                         setExportContent((current) => ({ ...current, [key]: checked }))
@@ -1115,6 +1156,26 @@ export default function App() {
             </label>
           </div>
 
+          <div className="toolbar-row answer-card-toolbar">
+            <label className="toolbar-label">本题答题卡
+              <select aria-label="本题答题卡" value={currentCard.id} onChange={(event) => {
+                const selected = otherCards.find((card) => card.id === event.target.value)
+                if (selected) swapAnswerCard(selected, otherCards.filter((card) => card.id !== selected.id))
+              }}>
+                {[currentCard, ...otherCards].slice().sort((a, b) =>
+                  (a.sequence ?? 1) - (b.sequence ?? 1))
+                  .map((card) => <option key={card.id} value={card.id}>{card.name}</option>)}
+              </select>
+            </label>
+            <button type="button" className="btn" onClick={() => setCardDialog('add')}>＋ 新增答题卡</button>
+            <button type="button" className="btn" onClick={() => setCardDialog('edit')}>答题卡设置</button>
+            {currentCard.display.review && (
+              <button type="button" className="btn" onClick={() => {
+                reviewRef.current?.scrollIntoView({ block: 'center' })
+                reviewRef.current?.focus({ preventScroll: true })
+              }}>复盘笔记</button>
+            )}
+          </div>
           <div className="toolbar-row stats">
             <span className="stat">
               已输入 <b>{stats.logical}</b> 字
@@ -1164,12 +1225,22 @@ export default function App() {
                 caretRow={caret.rowIndex}
                 caretColumn={caret.column}
                 caretFraction={caret.fraction}
+                card={activeBlock.card}
+                onIdentityChange={(field, value) => updateBlock(activeBlock.id, { card: { ...currentCard, [field]: value } })}
                 showTemplate={sheet.showTemplate}
                 split={isSplit}
                 paperLabel={paperLabel}
                 interactive
                 onPointerDown={handlePointerDown}
               />
+              {currentCard.display.review && (
+                <section className="answer-card-review" aria-labelledby="answer-review-title">
+                  <label id="answer-review-title" htmlFor="answer-review">复盘笔记</label>
+                  <textarea id="answer-review" ref={reviewRef} value={currentCard.review}
+                    placeholder="记下这次漏掉的要点、表达问题，或下次要改进的地方"
+                    onChange={(event) => updateBlock(activeBlock.id, { card: { ...currentCard, review: event.target.value } })} />
+                </section>
+              )}
             </div>
           </div>
         </div>
@@ -1204,9 +1275,22 @@ export default function App() {
           onFocusRequest={() => undefined}
         />
 
+          {cardDialog && (
+            <AnswerCardDialog adding={cardDialog === 'add'} card={cardDialog === 'add' ? {
+              ...currentCard,
+              sequence: otherCards.length + 2,
+              name: `第 ${otherCards.length + 2} 次练习`,
+              review: '',
+              display: { ...currentCard.display, name: true, instructions: false },
+            } : currentCard} onSave={saveAnswerCard} onClose={() => setCardDialog(null)} />
+          )}
           {showMarkSettings && (
             <MarkPresetDialog presets={markPresets}
-              onSave={(presets) => { setMarkPresets(presets); setShowMarkSettings(false) }}
+              onSave={(presets) => {
+                setMarkPresets(presets)
+                setMarks((current) => syncMarkPresets(current, presets))
+                setShowMarkSettings(false)
+              }}
               onClose={() => setShowMarkSettings(false)} />
           )}
           {practiceDialog && (

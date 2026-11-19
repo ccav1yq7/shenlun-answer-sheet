@@ -5,7 +5,7 @@ import {
 } from 'docx'
 import type { DocumentLayout, Panel } from '../layout'
 import type { SheetGeometry } from '../sheet/geometry'
-import type { AnswerSheet } from '../document/model'
+import type { AnswerCardDetails, AnswerSheet } from '../document/model'
 import { downloadBlob, textDocxSection, timestamp } from './exportDocx'
 
 const red = { style: BorderStyle.SINGLE, color: 'B74949', size: 4 }
@@ -53,7 +53,7 @@ function panelContent(panel: Panel, geometry: SheetGeometry, cellWidth: number) 
   return [paragraph(`${heading} · ${panel.capacity} 格`, 22), grid, paragraph('', 2)]
 }
 
-export function buildGridDocxBlob(layout: DocumentLayout, geometry: SheetGeometry, frontMatter?: AnswerSheet): Promise<Blob> {
+export function buildGridDocxBlob(layout: DocumentLayout, geometry: SheetGeometry, frontMatter?: AnswerSheet, card?: AnswerCardDetails): Promise<Blob> {
   const cellWidth = twips(geometry.cell)
   const panelWidth = cellWidth * geometry.columns
   const gap = twips(geometry.panelGap)
@@ -79,7 +79,10 @@ export function buildGridDocxBlob(layout: DocumentLayout, geometry: SheetGeometr
           },
         },
         children: [
-          paragraph('申论答题卡', 36),
+          ...(card?.display.title !== false ? [paragraph('申论答题卡', 36)] : []),
+          ...(card?.display.name ? [paragraph(card.name, 26)] : []),
+          ...(card?.display.identity && (card.candidateName || card.admissionNumber)
+            ? [paragraph(`姓名：${card.candidateName ?? ''}    准考证号：${card.admissionNumber ?? ''}`, 20)] : []),
           paragraph(`第 ${index + 1} 页 / 共 ${layout.pages.length} 页`, 20),
           new Table({
             layout: TableLayoutType.FIXED,
@@ -108,7 +111,7 @@ export function buildGridDocxBlob(layout: DocumentLayout, geometry: SheetGeometr
   return Packer.toBlob(document)
 }
 
-export async function exportGridDocx(layout: DocumentLayout, geometry: SheetGeometry, frontMatter?: AnswerSheet): Promise<void> {
-  const blob = await buildGridDocxBlob(layout, geometry, frontMatter)
+export async function exportGridDocx(layout: DocumentLayout, geometry: SheetGeometry, frontMatter?: AnswerSheet, card?: AnswerCardDetails): Promise<void> {
+  const blob = await buildGridDocxBlob(layout, geometry, frontMatter, card)
   downloadBlob(blob, `申论方格答题卡-${timestamp()}.docx`)
 }

@@ -1,3 +1,5 @@
+import type { ReadingMark } from '../components/AnnotatedText'
+
 export const markStyles = {
   highlight: '色块',
   underline: '下划线',
@@ -45,4 +47,16 @@ export function readMarkPresets(): MarkPreset[] {
 
 export function writeMarkPresets(presets: MarkPreset[]) {
   localStorage.setItem(storageKey, JSON.stringify(presets))
+}
+
+export function syncMarkPresets(marks: ReadingMark[], presets: MarkPreset[]): ReadingMark[] {
+  const byId = new Map(presets.map((preset) => [preset.id, preset]))
+  return marks.map((mark) => {
+    const next = byId.get(mark.preset?.id ?? defaultMarkPresets[0].id)
+    if (!next || (mark.preset && mark.preset.label === next.label && mark.preset.color === next.color
+      && mark.preset.style === next.style)) return mark
+    if (!mark.preset && next.label === defaultMarkPresets[0].label && next.color === defaultMarkPresets[0].color
+      && next.style === defaultMarkPresets[0].style) return mark
+    return { ...mark, preset: next }
+  })
 }

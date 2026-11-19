@@ -488,3 +488,31 @@
 .sheet-page--bare {
   border-color: #cfd4da;
 }
+
+.sheet-notice-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 3mm;
+}
+.sheet-card-name {
+  min-width: 0;
+  color: #1e3050;
+  font-size: 4.3mm;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.sheet-notice-heading b { flex-shrink: 0; }
+
+.sheet-meta .sheet-identity-input {
+  width: 32mm;
+  padding: 0 1mm;
+  border: 0;
+  border-bottom: 0.3mm solid #333;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  user-select: text;
+}
+.sheet-meta .sheet-identity-input.underline--short { width: 48mm; }

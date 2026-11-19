@@ -23,6 +23,30 @@ export interface ParagraphStyle {
   indentCells: number
 }
 
+export const defaultCardDisplay = {
+  name: true,
+  title: true,
+  identity: true,
+  instructions: true,
+  review: true,
+}
+
+export interface AnswerCardDetails {
+  id: string
+  name: string
+  sequence?: number
+  candidateName?: string
+  admissionNumber?: string
+  review: string
+  display: typeof defaultCardDisplay
+}
+
+export interface ArchivedAnswerCard extends AnswerCardDetails {
+  text: string
+  paragraphStyles: ParagraphStyle[]
+  indentFirstLine: boolean
+}
+
 export interface AnswerBlock {
   id: string
   /** 题目标题，如「第（一）大题 第1小题」 */
@@ -35,6 +59,12 @@ export interface AnswerBlock {
   paragraphStyles: ParagraphStyle[]
   /** 该题是否启用段首缩进（小题通常顶格，大作文/应用文空两格） */
   indentFirstLine: boolean
+  card?: AnswerCardDetails
+  otherCards?: ArchivedAnswerCard[]
+}
+
+export function activeAnswerCard(block: AnswerBlock): AnswerCardDetails {
+  return block.card ?? { id: 'original', name: '第 1 次练习', review: '', display: defaultCardDisplay }
 }
 
 export type SheetMode = 'single' | 'full'

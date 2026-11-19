@@ -10,6 +10,8 @@
 import { memo } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
 import { buildCellGlyphs, isSpaceCell } from './cellGlyphs'
+import { defaultCardDisplay } from '../document/model'
+import type { AnswerCardDetails } from '../document/model'
 import type { Cell, CompoundRule, DocumentLayout, Page, Panel, Row, Token } from '../layout'
 
 type TokenMap = Map<number, Token>
@@ -304,6 +306,8 @@ interface PageViewProps {
   caretRow: number
   caretColumn: number
   caretFraction: number
+  card?: AnswerCardDetails
+  onIdentityChange?: (field: 'candidateName' | 'admissionNumber', value: string) => void
   showTemplate: boolean
   interactive: boolean
   onPointerDown: (blockId: string, rowIndex: number, column: number, fraction: number, shift: boolean) => void
@@ -323,10 +327,13 @@ function PageViewInner({
   caretRow,
   caretColumn,
   caretFraction,
+  card,
+  onIdentityChange,
   showTemplate,
   interactive,
   onPointerDown,
 }: PageViewProps) {
+  const display = card?.display ?? defaultCardDisplay
   const isFirst = page.kind === 'first'
   const isLast = page.index === pageCount - 1
   const emptyTokens: TokenMap = EMPTY_TOKEN_MAP
@@ -356,31 +363,43 @@ function PageViewInner({
               </span>
             </div>
           )}
-          {isFirst ? (
+          {display.title && (isFirst ? (
             <>
               <h1 className="sheet-title">申论答题卡</h1>
               <p className="sheet-subtitle">适用于 市（地）级以下综合管理类和行政执法类 职位</p>
             </>
           ) : (
             <p className="cont-title">接上页，以下为答题区域，请勿折叠</p>
-          )}
-          <div className="sheet-meta">
-            <span className="field">
-              姓名：<i className="underline" />
-            </span>
-            <span className="field">
-              准考证号：<i className="underline underline--short" />
-            </span>
-          </div>
-          <div className="notice">
-            <b>注意事项</b>
-            <ol>
+          ))}
+          {display.identity && <div className="sheet-meta">
+            {([
+              ['candidateName', '姓名', '', 30],
+              ['admissionNumber', '准考证号', ' underline--short', 40],
+            ] as const).map(([field, label, variant, limit]) => (
+              <label className="field" key={field}>
+                {label}：
+                {isFirst && interactive && onIdentityChange ? (
+                  <input className={`underline sheet-identity-input${variant}`}
+                    aria-label={label} value={card?.[field] ?? ''} maxLength={limit}
+                    onChange={(event) => onIdentityChange(field, event.target.value)} />
+                ) : <span className={`underline${variant}`}>{card?.[field]}</span>}
+              </label>
+            ))}
+          </div>}
+          {((card && display.name) || display.instructions) && (
+            <div className="notice">
+              <div className="sheet-notice-heading">
+                {card && display.name && <strong className="sheet-card-name">{card.name}</strong>}
+                {display.instructions && <b>注意事项</b>}
+              </div>
+              {display.instructions && <ol>
               <li>请用黑色签字笔在方格内作答，超出答题区域的作答无效。</li>
               <li>一个汉字占一格，标点按其书写规范占格；不得折叠、污损答题卡。</li>
               <li>请在各题指定的答题区域内作答，不得跨区域答题，不得做任何标记。</li>
               <li>如需修改，请用修改符号划去后在旁边重写；字迹不清影响评卷的，责任由考生自负。</li>
-            </ol>
-          </div>
+              </ol>}
+            </div>
+          )}
         </div>
 
         {/* 中间那条竖向虚线只在左右两栏版式下才有意义；A4 单栏时画上去会横穿答题区 */}
@@ -442,6 +461,8 @@ export interface SheetViewProps {
   caretRow: number
   caretColumn: number
   caretFraction: number
+  card?: AnswerCardDetails
+  onIdentityChange?: (field: 'candidateName' | 'admissionNumber', value: string) => void
   showTemplate: boolean
   interactive: boolean
   onPointerDown: (blockId: string, rowIndex: number, column: number, fraction: number, shift: boolean) => void

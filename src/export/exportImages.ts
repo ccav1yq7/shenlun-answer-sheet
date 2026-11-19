@@ -18,6 +18,13 @@ async function* captureGridPages(source: HTMLElement) {
     const pages = Array.from(source.querySelectorAll<HTMLElement>('.sheet-page'), (page) => {
       const clone = page.cloneNode(true) as HTMLElement
       clone.style.boxShadow = 'none'
+      const identityFields = page.querySelectorAll<HTMLInputElement>('.sheet-identity-input')
+      clone.querySelectorAll<HTMLInputElement>('.sheet-identity-input').forEach((field, index) => {
+        const text = document.createElement('span')
+        text.className = field.className.replace('sheet-identity-input', '')
+        text.textContent = identityFields[index]?.value ?? ''
+        field.replaceWith(text)
+      })
       clone.querySelectorAll('.caret').forEach((node) => node.remove())
       clone.querySelectorAll('.cell--caret, .cell--selected').forEach((node) => {
         node.classList.remove('cell--caret', 'cell--selected')

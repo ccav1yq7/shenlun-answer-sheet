@@ -6,6 +6,7 @@ export interface ExportContent {
   prompt: boolean
   materials: boolean
   notes: boolean
+  review?: boolean
   answer: boolean
 }
 
