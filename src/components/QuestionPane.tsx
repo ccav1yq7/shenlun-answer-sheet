@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react'
 import { AnnotatedText } from './AnnotatedText'
+import type { MarkPreset } from '../document/readingMarks'
 import type { ReadingMark } from './AnnotatedText'
 import type { ImportedQuestion } from './QuestionImport'
 
@@ -11,6 +12,7 @@ interface QuestionPaneProps {
   widthPercent: number
   onWidthChange: (percent: number) => void
   marks: ReadingMark[]
+  presets: MarkPreset[]
   onSaveMark: (mark: ReadingMark) => void
   onRemoveMark: (id: string) => void
 }
@@ -52,7 +54,7 @@ function Tabs({ label, items, value, onChange, panel }: {
   </div>
 }
 
-export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPercent, onWidthChange, marks, onSaveMark, onRemoveMark }: QuestionPaneProps) {
+export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPercent, onWidthChange, marks, presets, onSaveMark, onRemoveMark }: QuestionPaneProps) {
   const sections = useMemo(() => materialSections(question.materials), [question.materials])
   const questions = question.paper?.questions ?? []
   const questionIndex = question.questionIndex ?? 0
@@ -98,19 +100,18 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
       <div className="question-prompt-content" id="question-prompt-panel"
         role={questions.length > 1 ? 'tabpanel' : undefined}
         aria-labelledby={questions.length > 1 ? `question-prompt-panel-tab-${questionIndex}` : undefined}>
-        <h2>题干</h2>
         <AnnotatedText key={`prompt-${questionIndex}`} text={prompt} source={`prompt-${questionIndex}`}
-          label={questions[questionIndex]?.label ?? '题干'} marks={marks} onSave={onSaveMark} onRemove={onRemoveMark} />
+          heading="题干" label={questions[questionIndex]?.label ?? '题干'} marks={marks} presets={presets} onSave={onSaveMark} onRemove={onRemoveMark} />
       </div>
       {(sections[materialIndex] || question.materials) && (
         <div className="question-material-content" id="question-material-panel" key={materialIndex}
           role={sections.length > 0 ? 'tabpanel' : undefined}
           aria-labelledby={sections.length > 0 ? `question-material-panel-tab-${materialIndex}` : undefined}
           tabIndex={0}>
-          <h2>{sections[materialIndex]?.label ?? '材料'}</h2>
           <AnnotatedText text={sections[materialIndex]?.text ?? question.materials}
             source={`material-${sections[materialIndex]?.label ?? 'all'}`}
-            label={sections[materialIndex]?.label ?? '材料'} marks={marks} onSave={onSaveMark} onRemove={onRemoveMark} />
+            heading={sections[materialIndex]?.label ?? '材料'}
+            label={sections[materialIndex]?.label ?? '材料'} marks={marks} presets={presets} onSave={onSaveMark} onRemove={onRemoveMark} />
         </div>
       )}
     </aside>

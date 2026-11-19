@@ -12,6 +12,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EditorSurface } from './components/EditorSurface'
 import type { EditorSurfaceHandle } from './components/EditorSurface'
 import { SheetView } from './components/SheetView'
+import { MarkPresetDialog } from './components/MarkPresetDialog'
+import { readMarkPresets } from './document/readingMarks'
 import type { ReadingMark } from './components/AnnotatedText'
 import { PracticeDialog } from './components/PracticeDialog'
 import { readPracticeDefaults, storePractice, writePracticeDefaults } from './document/practiceStore'
@@ -89,6 +91,8 @@ export default function App() {
     new URLSearchParams(window.location.search).get('practice') === '1' ? 'list' : null)
   const [currentPractice, setCurrentPractice] = useState<PracticeEntry | null>(null)
   const [activeBlockId, setActiveBlockId] = useState<string>(() => sheet.blocks[0].id)
+  const [markPresets, setMarkPresets] = useState(readMarkPresets)
+  const [showMarkSettings, setShowMarkSettings] = useState(false)
   const [marks, setMarks] = useState<ReadingMark[]>([])
   const [question, setQuestion] = useState<ImportedQuestion | null>(null)
   const questionRef = useRef(question)
@@ -833,6 +837,7 @@ export default function App() {
             <button type="button" className="btn" onClick={saveDefaults}
               title="保存当前字数、列数、版式、缩放、阅读栏宽度和导出选项">保存为默认设置</button>
             <span className="toolbar-sep" />
+            <button type="button" className="btn" onClick={() => setShowMarkSettings(true)}>标记偏好</button>
             <span className="toolbar-label">模式</span>
             <div className="chip-group">
               <button
@@ -1069,7 +1074,7 @@ export default function App() {
           {question && showQuestion && (
             <QuestionPane question={question} onQuestionChange={selectImportedQuestion}
               zoomOffset={zoomOffset} widthPercent={readerWidth} onWidthChange={setReaderWidth}
-              marks={marks} onSaveMark={(mark) => setMarks((current) => [...current.filter((item) => item.id !== mark.id), mark])}
+              marks={marks} presets={markPresets} onSaveMark={(mark) => setMarks((current) => [...current.filter((item) => item.id !== mark.id), mark])}
               onRemoveMark={(id) => setMarks((current) => current.filter((mark) => mark.id !== id))} />
           )}
           <div className="sheet-viewport" ref={viewportRef}>
@@ -1125,6 +1130,11 @@ export default function App() {
           onFocusRequest={() => undefined}
         />
 
+          {showMarkSettings && (
+            <MarkPresetDialog presets={markPresets}
+              onSave={(presets) => { setMarkPresets(presets); setShowMarkSettings(false) }}
+              onClose={() => setShowMarkSettings(false)} />
+          )}
           {practiceDialog && (
             <PracticeDialog mode={practiceDialog}
               name={currentPractice?.name ?? question?.paper?.title ?? '申论练习'}

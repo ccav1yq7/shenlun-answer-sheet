@@ -13,7 +13,7 @@ export function questionBlocks(question: ImportedQuestion | null, content = { pr
 
 export function readingNotesBlock(marks: ReadingMark[]) {
   const text = marks.map((mark) => {
-    const excerpt = `【${mark.label} · ${mark.note?.kind ?? '标记'}】\n原文：${mark.quote}`
+    const excerpt = `【${mark.label} · ${[mark.preset?.label, mark.note?.kind].filter(Boolean).join(' · ') || '标记'}】\n原文：${mark.quote}`
     return mark.note ? `${excerpt}\n笔记：${mark.note.text}` : excerpt
   }).join('\n\n')
   return { ...createBlock('标记与笔记', 0, false), text }
