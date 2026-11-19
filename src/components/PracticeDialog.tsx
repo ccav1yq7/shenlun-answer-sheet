@@ -1,3 +1,4 @@
+import { readWebDavSettings, synchronizeWebDav } from '../document/webdavSync'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DirectoryHandle, PracticeEntry, SavedPractice } from '../document/practiceStore'
 import {
@@ -29,6 +30,9 @@ export function PracticeDialog({ mode, name, current, onSave, onOpen, onUpdate, 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [filter, setFilter] = useState<'all' | Status>('all')
+  const [webdav, setWebdav] = useState(readWebDavSettings)
+  const [showWebdav, setShowWebdav] = useState(() => new URLSearchParams(location.search).get('webdav') === '1')
+  const [syncStatus, setSyncStatus] = useState('')
   const [editing, setEditing] = useState<{ record: PracticeEntry; name: string } | null>(null)
   const folderSupported = supportsPracticeDirectory()
 
@@ -148,6 +152,35 @@ export function PracticeDialog({ mode, name, current, onSave, onOpen, onUpdate, 
         </form>
       ) : (
         <>
+          <button className="btn" type="button" aria-expanded={showWebdav}
+            onClick={() => setShowWebdav((open) => !open)}>WebDAV 同步</button>
+          {showWebdav && <form className="practice-webdav" onSubmit={(event) => {
+            event.preventDefault()
+            setSyncStatus('')
+            void run(async () => {
+              if (directory && permission !== 'granted') throw new Error('请先重新授权本地文件夹。')
+              const result = await synchronizeWebDav(webdav, records, directory)
+              await refresh(directory)
+              setSyncStatus(`同步完成：上传 ${result.uploaded}，下载 ${result.downloaded}，冲突 ${result.conflicts}。`)
+            })
+          }}>
+            <label className="practice-name">WebDAV 目录
+              <input type="url" value={webdav.url} required placeholder="https://example.com/dav/练习/"
+                onChange={(event) => setWebdav({ ...webdav, url: event.target.value })} />
+            </label>
+            <label className="practice-name">WebDAV 用户名
+              <input value={webdav.username} required onChange={(event) => setWebdav({ ...webdav, username: event.target.value })} />
+            </label>
+            <label className="practice-name">WebDAV 密码
+              <input type="password" value={webdav.password} required autoComplete="off"
+                onChange={(event) => setWebdav({ ...webdav, password: event.target.value })} />
+            </label>
+            <p className="practice-hint">双向同步已保存的练习；云端保留版本，密码仅在当前网页会话使用。</p>
+            <div className="practice-actions">
+              <button className="btn btn--primary" type="submit" disabled={loading}>立即双向同步</button>
+              {syncStatus && <span role="status">{syncStatus}</span>}
+            </div>
+          </form>}
           <div className="practice-list-toolbar">
             <label className="practice-filter">筛选状态
               <select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)}>

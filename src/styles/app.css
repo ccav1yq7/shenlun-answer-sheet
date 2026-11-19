@@ -618,6 +618,8 @@ select:focus-visible,
   font-size: 12px;
 }
 
+.reading-paragraph-indent { display: inline-block; width: 2em; pointer-events: none; }
+
 .reading-passage {
   cursor: text;
 }
@@ -1080,3 +1082,14 @@ select:focus-visible,
   margin-top: 12px;
 }
 .answer-card-identity input { min-width: 0; }
+
+
+.practice-webdav {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.practice-webdav .practice-hint { margin: 0; }

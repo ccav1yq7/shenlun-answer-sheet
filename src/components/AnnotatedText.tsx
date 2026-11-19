@@ -29,13 +29,14 @@ interface AnnotatedTextProps {
   source: string
   label: string
   heading: string
+  indentParagraphs?: boolean
   marks: ReadingMark[]
   presets: MarkPreset[]
   onSave: (mark: ReadingMark) => void
   onRemove: (id: string) => void
 }
 
-export function AnnotatedText({ text, source, label, heading, marks, presets, onSave, onRemove }: AnnotatedTextProps) {
+export function AnnotatedText({ text, source, label, heading, indentParagraphs = false, marks, presets, onSave, onRemove }: AnnotatedTextProps) {
   const passage = useRef<HTMLParagraphElement>(null)
   const markElements = useRef(new Map<string, HTMLElement>())
   const noteInput = useId()
@@ -109,6 +110,24 @@ export function AnnotatedText({ text, source, label, heading, marks, presets, on
     setOverlay({ ...overlay, type: 'note', mark })
   }
 
+  let paragraphStart = true
+  let indentIndex = 0
+  function renderedText(value: string): ReactNode {
+    if (!indentParagraphs || !value) return value
+    const segments: ReactNode[] = []
+    for (const text of value.split(/(\n)/)) {
+      if (!text) continue
+      if (text === '\n') {
+        paragraphStart = true
+      } else if (paragraphStart && text.trim()) {
+        segments.push(<span className="reading-paragraph-indent" aria-hidden="true" key={indentIndex++} />)
+        paragraphStart = false
+      }
+      segments.push(text)
+    }
+    return segments
+  }
+
   const fragments: ReactNode[] = []
   let cursor = 0
   for (const mark of anchored) {
@@ -116,7 +135,7 @@ export function AnnotatedText({ text, source, label, heading, marks, presets, on
     const preset = validMarkPreset(mark.preset) ? mark.preset : defaultMarkPresets[0]
     const number = noteNumbers.get(mark.id)
     const active = activeMark?.id === mark.id
-    fragments.push(text.slice(cursor, mark.start))
+    fragments.push(renderedText(text.slice(cursor, mark.start)))
     fragments.push(
       <mark key={mark.id} ref={(element) => {
         if (element) markElements.current.set(mark.id, element)
@@ -132,11 +151,11 @@ export function AnnotatedText({ text, source, label, heading, marks, presets, on
             event.preventDefault()
             setOverlay({ type: 'note', anchor: event.currentTarget, mark })
           }
-        }}>{preset.style === 'transition' && <span className="reading-transition-symbol" aria-hidden="true" />}{mark.quote}</mark>,
+        }}>{preset.style === 'transition' && <span className="reading-transition-symbol" aria-hidden="true" />}{renderedText(mark.quote)}</mark>,
     )
     cursor = mark.end
   }
-  fragments.push(text.slice(cursor))
+  fragments.push(renderedText(text.slice(cursor)))
 
   return <div className="reading-text">
     <header className="reading-heading">

@@ -108,7 +108,7 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
           role={sections.length > 0 ? 'tabpanel' : undefined}
           aria-labelledby={sections.length > 0 ? `question-material-panel-tab-${materialIndex}` : undefined}
           tabIndex={0}>
-          <AnnotatedText text={sections[materialIndex]?.text ?? question.materials}
+          <AnnotatedText indentParagraphs text={sections[materialIndex]?.text ?? question.materials}
             source={`material-${sections[materialIndex]?.label ?? 'all'}`}
             heading={sections[materialIndex]?.label ?? '材料'}
             label={sections[materialIndex]?.label ?? '材料'} marks={marks} presets={presets} onSave={onSaveMark} onRemove={onRemoveMark} />

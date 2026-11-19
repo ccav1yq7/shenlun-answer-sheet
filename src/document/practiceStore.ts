@@ -154,12 +154,12 @@ function isAnswer(value: SavedAnswer | undefined): boolean {
       && Array.isArray(block.paragraphStyles)))
 }
 
-async function readPracticeFile(handle: FileSystemFileHandle): Promise<SavedPractice> {
-  const record: SavedPractice = JSON.parse(await (await handle.getFile()).text())
+export function parsePractice(text: string, expectedId?: string): SavedPractice {
+  const record: SavedPractice = JSON.parse(text)
   const snapshot = record?.snapshot
   const question = snapshot?.question
   if (!record || typeof record.id !== 'string' || !validId.test(record.id)
-    || handle.name !== practiceFilename(record.id) || typeof record.name !== 'string'
+    || (expectedId !== undefined && record.id !== expectedId) || typeof record.name !== 'string'
     || typeof record.updatedAt !== 'string' || !snapshot || !isAnswer(snapshot)
     || !Array.isArray(snapshot.otherAnswers)
     || !snapshot.otherAnswers.every((entry) => Array.isArray(entry) && Number.isInteger(entry[0]) && isAnswer(entry[1]))
@@ -177,6 +177,10 @@ async function readPracticeFile(handle: FileSystemFileHandle): Promise<SavedPrac
     throw new Error('练习文件格式无效')
   }
   return record
+}
+
+async function readPracticeFile(handle: FileSystemFileHandle): Promise<SavedPractice> {
+  return parsePractice(await (await handle.getFile()).text(), handle.name.slice('shenlun-practice-'.length, -5))
 }
 
 export async function listDirectoryPractices(directory: DirectoryHandle) {
