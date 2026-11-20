@@ -27,10 +27,18 @@ export interface SavedAnswer {
   activeBlockId: string
 }
 
+export interface ReadingMarkSet {
+  id: string
+  name: string
+  marks: ReadingMark[]
+}
+
 export interface PracticeSnapshot extends SavedAnswer {
   question: ImportedQuestion | null
   otherAnswers: [number, SavedAnswer][]
   marks: ReadingMark[]
+  activeMarkSet?: Omit<ReadingMarkSet, 'marks'> & { index?: number }
+  otherMarkSets?: ReadingMarkSet[]
   showQuestion: boolean
   preferences: PracticePreferences
 }
@@ -154,6 +162,18 @@ function isAnswer(value: SavedAnswer | undefined): boolean {
       && Array.isArray(block.paragraphStyles)))
 }
 
+function isReadingMarks(marks: ReadingMark[]): boolean {
+  return Array.isArray(marks) && marks.every((mark) =>
+    mark && typeof mark.id === 'string' && typeof mark.source === 'string'
+    && typeof mark.quote === 'string' && typeof mark.label === 'string'
+    && Number.isInteger(mark.start) && Number.isInteger(mark.end)
+    && (!mark.note || (typeof mark.note.text === 'string' && ['提炼', '改写', '随记'].includes(mark.note.kind))))
+}
+
+function isMarkSetDetails(set: Omit<ReadingMarkSet, 'marks'>): boolean {
+  return Boolean(set && typeof set.id === 'string' && set.id && typeof set.name === 'string' && set.name.trim())
+}
+
 export function parsePractice(text: string, expectedId?: string): SavedPractice {
   const record: SavedPractice = JSON.parse(text)
   const snapshot = record?.snapshot
@@ -163,11 +183,12 @@ export function parsePractice(text: string, expectedId?: string): SavedPractice 
     || typeof record.updatedAt !== 'string' || !snapshot || !isAnswer(snapshot)
     || !Array.isArray(snapshot.otherAnswers)
     || !snapshot.otherAnswers.every((entry) => Array.isArray(entry) && Number.isInteger(entry[0]) && isAnswer(entry[1]))
-    || !Array.isArray(snapshot.marks) || snapshot.marks.some((mark) =>
-      !mark || typeof mark.id !== 'string' || typeof mark.source !== 'string'
-      || typeof mark.quote !== 'string' || typeof mark.label !== 'string'
-      || !Number.isInteger(mark.start) || !Number.isInteger(mark.end)
-      || (mark.note && (typeof mark.note.text !== 'string' || !['提炼', '改写', '随记'].includes(mark.note.kind))))
+    || !isReadingMarks(snapshot.marks)
+    || (snapshot.activeMarkSet !== undefined && !isMarkSetDetails(snapshot.activeMarkSet))
+    || (snapshot.otherMarkSets !== undefined && (!Array.isArray(snapshot.otherMarkSets)
+      || snapshot.otherMarkSets.some((set) => !isMarkSetDetails(set) || !isReadingMarks(set.marks))
+      || new Set([snapshot.activeMarkSet?.id ?? 'original', ...snapshot.otherMarkSets.map((set) => set.id)]).size
+        !== snapshot.otherMarkSets.length + 1))
     || !snapshot.preferences?.exportContent || !Number.isFinite(snapshot.preferences.readerWidth)
     || !Number.isFinite(snapshot.preferences.zoomBase)
     || (snapshot.preferences.zoom !== 'fit' && !Number.isFinite(snapshot.preferences.zoom))

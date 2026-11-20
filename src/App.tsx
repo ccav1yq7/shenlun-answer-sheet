@@ -19,7 +19,7 @@ import type { ReadingMark } from './components/AnnotatedText'
 import { AnswerCardDialog } from './components/AnswerCardDialog'
 import { PracticeDialog } from './components/PracticeDialog'
 import { readPracticeDefaults, storePractice, writePracticeDefaults } from './document/practiceStore'
-import type { DirectoryHandle, PracticeEntry, PracticePreferences, PracticeSnapshot, SavedPractice } from './document/practiceStore'
+import type { DirectoryHandle, PracticeEntry, PracticePreferences, PracticeSnapshot, ReadingMarkSet, SavedPractice } from './document/practiceStore'
 import { QuestionPane } from './components/QuestionPane'
 import { QuestionImport } from './components/QuestionImport'
 import type { ImportedQuestion } from './components/QuestionImport'
@@ -102,7 +102,26 @@ export default function App() {
   const [activeBlockId, setActiveBlockId] = useState<string>(() => sheet.blocks[0].id)
   const [markPresets, setMarkPresets] = useState(readMarkPresets)
   const [showMarkSettings, setShowMarkSettings] = useState(false)
-  const [marks, setMarks] = useState<ReadingMark[]>([])
+  const [markSets, setMarkSets] = useState<ReadingMarkSet[]>(() => [{ id: 'original', name: '第 1 套标记', marks: [] }])
+  const [markSetId, setMarkSetId] = useState('original')
+  const activeMarkSet = markSets.find((set) => set.id === markSetId) ?? markSets[0]
+  const marks = activeMarkSet.marks
+
+  function updateReadingMarks(update: (marks: ReadingMark[]) => ReadingMark[]) {
+    setMarkSets((sets) => sets.map((set) => set.id === activeMarkSet.id
+      ? { ...set, marks: update(set.marks) }
+      : set))
+  }
+
+  function saveMarkSet(name: string, create: boolean) {
+    if (create) {
+      const id = crypto.randomUUID()
+      setMarkSets((sets) => [...sets, { id, name, marks: [] }])
+      setMarkSetId(id)
+    } else {
+      setMarkSets((sets) => sets.map((set) => set.id === activeMarkSet.id ? { ...set, name } : set))
+    }
+  }
   const [question, setQuestion] = useState<ImportedQuestion | null>(null)
   const questionRef = useRef(question)
   questionRef.current = question
@@ -323,12 +342,16 @@ export default function App() {
     activeBlockId,
     question,
     marks,
+    ...(markSets.length > 1 || activeMarkSet.name !== '第 1 套标记' ? {
+      activeMarkSet: { id: activeMarkSet.id, name: activeMarkSet.name, index: markSets.indexOf(activeMarkSet) },
+      otherMarkSets: markSets.filter((set) => set.id !== activeMarkSet.id),
+    } : {}),
     showQuestion,
     preferences: practicePreferences(activeCapacity),
     otherAnswers: [...questionAnswers.current.entries()]
       .filter(([index]) => index !== (question?.questionIndex ?? 0))
       .sort(([a], [b]) => a - b),
-  }), [sheet, activeBlockId, question, marks, showQuestion, practicePreferences, activeCapacity])
+  }), [sheet, activeBlockId, question, marks, markSets, activeMarkSet, showQuestion, practicePreferences, activeCapacity])
 
   const unsaved = useMemo(() => currentPractice !== null
     && JSON.stringify(snapshot) !== JSON.stringify(currentPractice.snapshot), [snapshot, currentPractice])
@@ -413,7 +436,14 @@ export default function App() {
     setSelection({ start: 0, end: 0 })
     editorRef.current?.setValue(block.text, 0)
     setQuestion(saved.question)
-    setMarks(syncMarkPresets(saved.marks, markPresets))
+    const savedMarkSet = saved.activeMarkSet ?? { id: 'original', name: '第 1 套标记' }
+    const restoredMarkSets = [...(saved.otherMarkSets ?? [])]
+    const index = saved.activeMarkSet?.index
+    restoredMarkSets.splice(typeof index === 'number' && Number.isInteger(index) && index >= 0 ? index : 0, 0, {
+      id: savedMarkSet.id, name: savedMarkSet.name, marks: saved.marks,
+    })
+    setMarkSets(restoredMarkSets.map((set) => ({ ...set, marks: syncMarkPresets(set.marks, markPresets) })))
+    setMarkSetId(savedMarkSet.id)
     setShowQuestion(saved.showQuestion)
     questionAnswers.current = new Map(saved.otherAnswers)
     undoStack.current = []
@@ -1249,10 +1279,12 @@ export default function App() {
           {question && showQuestion && (
             <QuestionPane question={question} onQuestionChange={selectImportedQuestion}
               zoomOffset={zoomOffset} widthPercent={readerWidth} onWidthChange={setReaderWidth}
-              marks={marks} presets={markPresets} onSaveMark={(mark) => setMarks((current) => current.some((item) => item.id === mark.id)
+              marks={marks} presets={markPresets} markSets={markSets} activeMarkSet={activeMarkSet}
+              onMarkSetChange={setMarkSetId} onSaveMarkSet={saveMarkSet}
+              onSaveMark={(mark) => updateReadingMarks((current) => current.some((item) => item.id === mark.id)
                 ? current.map((item) => item.id === mark.id ? mark : item)
                 : [...current, mark])}
-              onRemoveMark={(id) => setMarks((current) => current.filter((mark) => mark.id !== id))} />
+              onRemoveMark={(id) => updateReadingMarks((current) => current.filter((mark) => mark.id !== id))} />
           )}
           <div className="sheet-viewport" ref={viewportRef}>
             <div className="sheet-scaler" ref={exportSourceRef} style={{ zoom: scale } as React.CSSProperties}>
@@ -1330,7 +1362,7 @@ export default function App() {
             <MarkPresetDialog presets={markPresets}
               onSave={(presets) => {
                 setMarkPresets(presets)
-                setMarks((current) => syncMarkPresets(current, presets))
+                setMarkSets((sets) => sets.map((set) => ({ ...set, marks: syncMarkPresets(set.marks, presets) })))
                 setShowMarkSettings(false)
               }}
               onClose={() => setShowMarkSettings(false)} />
@@ -1356,7 +1388,10 @@ export default function App() {
                   selectImportedQuestion(imported.questionIndex ?? 0)
                 } else if (!samePaper) {
                   questionAnswers.current.clear()
-                  if (imported.paper || !question) setMarks([])
+                  if (imported.paper || !question) {
+                    setMarkSets([{ id: 'original', name: '第 1 套标记', marks: [] }])
+                    setMarkSetId('original')
+                  }
                   if (imported.paper && question) setCurrentPractice(null)
                   const selected = imported.paper?.questions[imported.questionIndex ?? 0]
                   if (selected) updateBlock(activeBlock.id, {

@@ -1121,3 +1121,31 @@ select:focus-visible,
   background: var(--panel);
   box-shadow: 0 8px 24px #10182824;
 }
+
+.reading-mark-sets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+
+.reading-mark-sets label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.reading-mark-sets select,
+.reading-mark-sets input {
+  min-width: 0;
+  max-width: 12em;
+  padding: 5px 7px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel);
+  color: inherit;
+  font: inherit;
+}

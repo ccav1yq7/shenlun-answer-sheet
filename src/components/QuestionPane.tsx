@@ -3,6 +3,7 @@ import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react'
 import { AnnotatedText } from './AnnotatedText'
 import type { MarkPreset } from '../document/readingMarks'
 import type { ReadingMark } from './AnnotatedText'
+import type { ReadingMarkSet } from '../document/practiceStore'
 import type { ImportedQuestion } from './QuestionImport'
 
 interface QuestionPaneProps {
@@ -12,6 +13,10 @@ interface QuestionPaneProps {
   widthPercent: number
   onWidthChange: (percent: number) => void
   marks: ReadingMark[]
+  markSets: ReadingMarkSet[]
+  activeMarkSet: ReadingMarkSet
+  onMarkSetChange: (id: string) => void
+  onSaveMarkSet: (name: string, create: boolean) => void
   presets: MarkPreset[]
   onSaveMark: (mark: ReadingMark) => void
   onRemoveMark: (id: string) => void
@@ -54,7 +59,8 @@ function Tabs({ label, items, value, onChange, panel }: {
   </div>
 }
 
-export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPercent, onWidthChange, marks, presets, onSaveMark, onRemoveMark }: QuestionPaneProps) {
+export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPercent, onWidthChange, marks, markSets, activeMarkSet, onMarkSetChange, onSaveMarkSet, presets, onSaveMark, onRemoveMark }: QuestionPaneProps) {
+  const [markSetEdit, setMarkSetEdit] = useState<{ create: boolean; name: string } | null>(null)
   const sections = useMemo(() => materialSections(question.materials), [question.materials])
   const questions = question.paper?.questions ?? []
   const questionIndex = question.questionIndex ?? 0
@@ -96,11 +102,43 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
           value={materialIndex} onChange={(index) => setSelectedMaterial({ question: questionIndex, index })}
           panel="question-material-panel" />}
       </div>
+      <div className="reading-mark-sets">
+        <label>标记方案
+          <select aria-label="切换标记方案" value={activeMarkSet.id} onChange={(event) => {
+            onMarkSetChange(event.target.value)
+            setMarkSetEdit(null)
+          }}>
+            {markSets.map((set) => <option key={set.id} value={set.id}>{set.name}</option>)}
+          </select>
+        </label>
+        <button className="btn" type="button" onClick={() => {
+          let number = markSets.length + 1
+          while (markSets.some((set) => set.name === `第 ${number} 套标记`)) number++
+          setMarkSetEdit({ create: true, name: `第 ${number} 套标记` })
+        }}>新增标记方案</button>
+        <button className="btn" type="button" onClick={() => setMarkSetEdit({
+          create: false, name: activeMarkSet.name,
+        })}>重命名</button>
+      </div>
+      {markSetEdit && <form className="reading-mark-sets" onSubmit={(event) => {
+        event.preventDefault()
+        const name = markSetEdit.name.trim()
+        if (!name) return
+        onSaveMarkSet(name, markSetEdit.create)
+        setMarkSetEdit(null)
+      }}>
+        <label>方案名称
+          <input autoFocus required maxLength={40} value={markSetEdit.name}
+            onChange={(event) => setMarkSetEdit({ ...markSetEdit, name: event.target.value })} />
+        </label>
+        <button type="submit" className="btn btn--primary">保存方案</button>
+        <button type="button" className="btn" onClick={() => setMarkSetEdit(null)}>取消</button>
+      </form>}
       <p className="reading-hint">选中文字可标记或写笔记</p>
       <div className="question-prompt-content" id="question-prompt-panel"
         role={questions.length > 1 ? 'tabpanel' : undefined}
         aria-labelledby={questions.length > 1 ? `question-prompt-panel-tab-${questionIndex}` : undefined}>
-        <AnnotatedText key={`prompt-${questionIndex}`} text={prompt} source={`prompt-${questionIndex}`}
+        <AnnotatedText key={`${activeMarkSet.id}-prompt-${questionIndex}`} text={prompt} source={`prompt-${questionIndex}`}
           heading="题干" label={questions[questionIndex]?.label ?? '题干'} marks={marks} presets={presets} onSave={onSaveMark} onRemove={onRemoveMark} />
       </div>
       {(sections[materialIndex] || question.materials) && (
@@ -108,7 +146,7 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
           role={sections.length > 0 ? 'tabpanel' : undefined}
           aria-labelledby={sections.length > 0 ? `question-material-panel-tab-${materialIndex}` : undefined}
           tabIndex={0}>
-          <AnnotatedText indentParagraphs text={sections[materialIndex]?.text ?? question.materials}
+          <AnnotatedText key={activeMarkSet.id} indentParagraphs text={sections[materialIndex]?.text ?? question.materials}
             source={`material-${sections[materialIndex]?.label ?? 'all'}`}
             heading={sections[materialIndex]?.label ?? '材料'}
             label={sections[materialIndex]?.label ?? '材料'} marks={marks} presets={presets} onSave={onSaveMark} onRemove={onRemoveMark} />
