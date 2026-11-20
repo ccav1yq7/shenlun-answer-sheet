@@ -1,3 +1,4 @@
+import { hasFenbiAssistant, requestFenbiAssistant } from './document/fenbiAssistant'
 /**
  * 申论电脑模拟答题卡 —— 应用外壳
  *
@@ -114,6 +115,16 @@ export default function App() {
   const zoomBase = useRef(defaults.zoomBase ?? 1)
   const questionAnswers = useRef(new Map<number, { sheet: AnswerSheet; activeBlockId: string }>())
   const [toast, setToast] = useState<string | null>(null)
+  const [assistantAvailable, setAssistantAvailable] = useState(hasFenbiAssistant)
+  const [openWebdav, setOpenWebdav] = useState(false)
+  const [returningAnswer, setReturningAnswer] = useState(false)
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => setAssistantAvailable(hasFenbiAssistant()))
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-fenbi-assistant'] })
+    setAssistantAvailable(hasFenbiAssistant())
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.hash.slice(1))
@@ -127,7 +138,10 @@ export default function App() {
       if (typeof data?.prompt !== 'string' || !data.prompt.trim() || typeof data.materials !== 'string') {
         throw new Error('invalid question')
       }
-      setQuestion({ prompt: data.prompt, materials: data.materials })
+      setQuestion({
+        prompt: data.prompt, materials: data.materials,
+        assistantLink: typeof data.assistantLink === 'string' ? data.assistantLink : undefined,
+      })
       if (Number.isInteger(data.capacity) && data.capacity > 0 && data.capacity <= 10000) {
         setSheet((current) => ({
           ...current,
@@ -950,6 +964,34 @@ export default function App() {
               title="保存当前字数、列数、版式、缩放、阅读栏宽度和导出选项">保存为默认设置</button>
             <span className="toolbar-sep" />
             <button type="button" className="btn" onClick={() => setShowMarkSettings(true)}>标记偏好</button>
+            {assistantAvailable && <details className="assistant-settings">
+              <summary className="btn">粉笔助手 · 高级设置</summary>
+              <div className="assistant-settings-panel">
+                <button type="button" className="btn" onClick={() => {
+                  setOpenWebdav(true)
+                  void showPracticeDialog('list')
+                }}>WebDAV 同步</button>
+                <button type="button" className="btn" onClick={() => setShowMarkSettings(true)}>标记偏好</button>
+                <button type="button" className="btn" onClick={saveDefaults}>保存答题偏好</button>
+              </div>
+            </details>}
+            {assistantAvailable && question?.assistantLink && sheet.mode === 'single' && (
+              <button type="button" className="btn" disabled={returningAnswer || !activeBlock.text.trim()}
+                onClick={async () => {
+                  if (!window.confirm('将当前答题卡的答案填入对应粉笔原题，并尝试提交单题批改。继续吗？')) return
+                  setReturningAnswer(true)
+                  try {
+                    await requestFenbiAssistant({
+                      action: 'return-answer', link: question.assistantLink, answer: activeBlock.text, submit: true,
+                    })
+                    setToast('已请求打开粉笔原题，请在粉笔页查看批改提交结果。')
+                  } catch (error) {
+                    setToast(error instanceof Error ? error.message : '回填请求失败。')
+                  } finally {
+                    setReturningAnswer(false)
+                  }
+                }}>提交粉笔批改</button>
+            )}
             <span className="toolbar-label">模式</span>
             <div className="chip-group">
               <button
@@ -1294,7 +1336,7 @@ export default function App() {
               onClose={() => setShowMarkSettings(false)} />
           )}
           {practiceDialog && (
-            <PracticeDialog mode={practiceDialog}
+            <PracticeDialog mode={practiceDialog} openWebdav={openWebdav}
               name={currentPractice?.name ?? question?.paper?.title ?? '申论练习'}
               current={currentPractice}
               onSave={savePractice} onOpen={openPractice}
@@ -1303,7 +1345,7 @@ export default function App() {
                   setCurrentPractice(updated)
                 }
               }}
-              onClose={() => setPracticeDialog(null)} />
+              onClose={() => { setPracticeDialog(null); setOpenWebdav(false) }} />
           )}
           {importingQuestion && (
             <QuestionImport

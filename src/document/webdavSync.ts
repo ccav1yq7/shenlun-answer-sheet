@@ -1,3 +1,4 @@
+import { hasFenbiAssistant, requestFenbiAssistant } from './fenbiAssistant'
 import { parsePractice, reloadPractice, storePractice } from './practiceStore'
 import type { DirectoryHandle, PracticeEntry, SavedPractice } from './practiceStore'
 
@@ -77,14 +78,26 @@ export async function synchronizeWebDav(settings: WebDavSettings, entries: Pract
   const auth = 'Basic ' + btoa(Array.from(encoder.encode(username + ':' + settings.password),
     (byte) => String.fromCharCode(byte)).join(''))
   async function request(method: string, filename = '', headers: Record<string, string> = {}, body?: string) {
-    let result: Response
-    try {
-      result = await fetch(new URL(filename, endpoint), {
-        method, headers: { Authorization: auth, ...headers }, body,
-        credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(15000),
+    const url = new URL(filename, endpoint)
+    const requestHeaders = { Authorization: auth, ...headers }
+    let result: { status: number; ok: boolean; text: () => Promise<string> }
+    if (url.origin === 'https://dav.jianguoyun.com') {
+      if (!hasFenbiAssistant()) throw new Error('坚果云同步需要粉笔助手。安装或更新脚本后请刷新此页。')
+      if (endpoint.pathname === '/dav/') throw new Error('请先在坚果云新建「申论练习」文件夹，再填写该文件夹的 WebDAV 地址。')
+      const reply = await requestFenbiAssistant({
+        action: 'webdav', url: url.href, method, headers: requestHeaders, body,
       })
-    } catch {
-      throw new Error('无法连接 WebDAV，请检查 HTTPS 地址、网络或服务的跨域设置。')
+      const status = reply.status ?? 0
+      result = { status, ok: status >= 200 && status < 300, text: async () => reply.text ?? '' }
+    } else {
+      try {
+        result = await fetch(url, {
+          method, headers: requestHeaders, body,
+          credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(15000),
+        })
+      } catch {
+        throw new Error('无法连接 WebDAV，请检查 HTTPS 地址、网络或服务的跨域设置。')
+      }
     }
     if (result.status === 401 || result.status === 403) throw new Error('WebDAV 拒绝访问，请检查账号和目录权限。')
     return result

@@ -1093,3 +1093,31 @@ select:focus-visible,
   border-radius: 8px;
 }
 .practice-webdav .practice-hint { margin: 0; }
+
+.assistant-settings {
+  position: relative;
+}
+
+.assistant-settings > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.assistant-settings[open] > summary {
+  background: var(--line);
+}
+
+.assistant-settings-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 12;
+  display: grid;
+  gap: 6px;
+  min-width: max-content;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 8px 24px #10182824;
+}

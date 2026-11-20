@@ -10,6 +10,7 @@ import {
 type Status = NonNullable<SavedPractice['status']>
 
 interface PracticeDialogProps {
+  openWebdav?: boolean
   mode: 'save' | 'list'
   name: string
   current: PracticeEntry | null
@@ -19,7 +20,7 @@ interface PracticeDialogProps {
   onClose: () => void
 }
 
-export function PracticeDialog({ mode, name, current, onSave, onOpen, onUpdate, onClose }: PracticeDialogProps) {
+export function PracticeDialog({ mode, name, current, onSave, onOpen, onUpdate, onClose, openWebdav }: PracticeDialogProps) {
   const dialog = useRef<HTMLDialogElement>(null)
   const [draft, setDraft] = useState(name)
   const [status, setStatus] = useState<Status>(current?.status ?? 'in-progress')
@@ -31,7 +32,7 @@ export function PracticeDialog({ mode, name, current, onSave, onOpen, onUpdate, 
   const [error, setError] = useState('')
   const [filter, setFilter] = useState<'all' | Status>('all')
   const [webdav, setWebdav] = useState(readWebDavSettings)
-  const [showWebdav, setShowWebdav] = useState(() => new URLSearchParams(location.search).get('webdav') === '1')
+  const [showWebdav, setShowWebdav] = useState(() => openWebdav || new URLSearchParams(location.search).get('webdav') === '1')
   const [syncStatus, setSyncStatus] = useState('')
   const [editing, setEditing] = useState<{ record: PracticeEntry; name: string } | null>(null)
   const folderSupported = supportsPracticeDirectory()
@@ -165,7 +166,7 @@ export function PracticeDialog({ mode, name, current, onSave, onOpen, onUpdate, 
             })
           }}>
             <label className="practice-name">WebDAV 目录
-              <input type="url" value={webdav.url} required placeholder="https://example.com/dav/练习/"
+              <input type="url" value={webdav.url} required placeholder="https://dav.jianguoyun.com/dav/申论练习/"
                 onChange={(event) => setWebdav({ ...webdav, url: event.target.value })} />
             </label>
             <label className="practice-name">WebDAV 用户名

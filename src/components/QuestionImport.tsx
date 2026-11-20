@@ -7,6 +7,7 @@ export interface ImportedQuestion {
   prompt: string
   paper?: FenbiPaper
   questionIndex?: number
+  assistantLink?: string
 }
 
 interface QuestionImportProps {
