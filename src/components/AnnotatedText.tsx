@@ -2,6 +2,7 @@ import { useId, useRef, useState } from 'react'
 import type { CSSProperties, FormEvent, ReactNode } from 'react'
 import { defaultMarkPresets, markStyles, validMarkPreset } from '../document/readingMarks'
 import type { MarkPreset } from '../document/readingMarks'
+import { anchorReadingMark } from '../document/readingOrder'
 import { ReadingPopover } from './ReadingPopover'
 
 export const noteKinds = ['提炼', '改写', '随记'] as const
@@ -31,12 +32,13 @@ interface AnnotatedTextProps {
   heading: string
   indentParagraphs?: boolean
   marks: ReadingMark[]
+  noteNumbers: ReadonlyMap<string, number>
   presets: MarkPreset[]
   onSave: (mark: ReadingMark) => void
   onRemove: (id: string) => void
 }
 
-export function AnnotatedText({ text, source, label, heading, indentParagraphs = false, marks, presets, onSave, onRemove }: AnnotatedTextProps) {
+export function AnnotatedText({ text, source, label, heading, indentParagraphs = false, marks, noteNumbers, presets, onSave, onRemove }: AnnotatedTextProps) {
   const passage = useRef<HTMLDivElement>(null)
   const markElements = useRef(new Map<string, HTMLElement>())
   const noteInput = useId()
@@ -51,17 +53,11 @@ export function AnnotatedText({ text, source, label, heading, indentParagraphs =
   const draftMark = activeMark && overlay?.type === 'edit' && !ownMarks.some((mark) => mark.id === activeMark.id)
     ? activeMark : null
   const visibleMarks = draftMark ? [...ownMarks, draftMark] : ownMarks
-  const noteNumbers = new Map((draftMark ? [...marks, draftMark] : marks)
-    .filter((mark) => mark.note || (overlay?.type === 'edit' && mark.id === activeMark?.id))
-    .map((mark, index) => [mark.id, index + 1]))
   const activePreset = validMarkPreset(activeMark?.preset) ? activeMark.preset : defaultMarkPresets[0]
   const activeNumber = activeMark ? noteNumbers.get(activeMark.id) : undefined
-  const anchored = visibleMarks.flatMap((mark) => {
-    if (text.slice(mark.start, mark.end) === mark.quote) return [mark]
-    const start = text.indexOf(mark.quote)
-    return start >= 0 && start === text.lastIndexOf(mark.quote)
-      ? [{ ...mark, start, end: start + mark.quote.length }] : []
-  }).sort((a, b) => a.start - b.start)
+  const anchored = visibleMarks.map((mark) => anchorReadingMark(mark, text))
+    .filter((mark): mark is ReadingMark => mark !== undefined)
+    .sort((a, b) => a.start - b.start)
 
   const activeSourceExists = activeMark && anchored.some((mark) => mark.id === activeMark.id)
 
@@ -363,7 +359,8 @@ export function AnnotatedText({ text, source, label, heading, indentParagraphs =
           <button type="button" className="reading-icon-button" aria-label="关闭列表" onClick={close}>×</button>
         </div>
         <div className="reading-index">
-          {ownMarks.slice().sort((a, b) => a.start - b.start).map((mark) => (
+          {[...anchored.filter((mark) => mark.id !== draftMark?.id),
+            ...ownMarks.filter((mark) => !anchored.some((anchor) => anchor.id === mark.id))].map((mark) => (
             <button type="button" key={mark.id} onClick={() => {
               const anchor = markElements.current.get(mark.id)
               anchor?.scrollIntoView({ block: 'nearest' })

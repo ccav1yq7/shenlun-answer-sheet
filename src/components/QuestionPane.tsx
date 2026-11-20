@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react'
 import { AnnotatedText } from './AnnotatedText'
 import type { MarkPreset } from '../document/readingMarks'
+import { materialSections, orderReadingMarks, questionReadingSources } from '../document/readingOrder'
 import type { ReadingMark } from './AnnotatedText'
 import type { ReadingMarkSet } from '../document/practiceStore'
 import type { ImportedQuestion } from './QuestionImport'
@@ -20,15 +21,6 @@ interface QuestionPaneProps {
   presets: MarkPreset[]
   onSaveMark: (mark: ReadingMark) => void
   onRemoveMark: (id: string) => void
-}
-
-function materialSections(text: string) {
-  const headings = [...text.matchAll(/^\s*(材料\s*[一二三四五六七八九十\d]+)[ \t]*$/gm)]
-  if (!headings.length || text.slice(0, headings[0].index).trim()) return []
-  return headings.map((heading, index) => ({
-    label: heading[1].replace(/\s/g, ''),
-    text: text.slice(heading.index + heading[0].length, headings[index + 1]?.index).trim(),
-  })).filter((section) => section.text)
 }
 
 function Tabs({ label, items, value, onChange, panel }: {
@@ -90,6 +82,10 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
+  const orderedMarks = useMemo(() => orderReadingMarks(marks, questionReadingSources(question)), [marks, question])
+  const noteNumbers = useMemo(() => new Map(orderedMarks.filter((mark) => mark.note)
+    .map((mark, index) => [mark.id, index + 1])), [orderedMarks])
+
   const prompt = questions.length > 1 ? questions[questionIndex]?.prompt ?? question.prompt : question.prompt
 
   return <>
@@ -139,7 +135,7 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
         role={questions.length > 1 ? 'tabpanel' : undefined}
         aria-labelledby={questions.length > 1 ? `question-prompt-panel-tab-${questionIndex}` : undefined}>
         <AnnotatedText key={`${activeMarkSet.id}-prompt-${questionIndex}`} text={prompt} source={`prompt-${questionIndex}`}
-          heading="题干" label={questions[questionIndex]?.label ?? '题干'} marks={marks} presets={presets} onSave={onSaveMark} onRemove={onRemoveMark} />
+          heading="题干" label={questions[questionIndex]?.label ?? '题干'} marks={marks} noteNumbers={noteNumbers} presets={presets} onSave={onSaveMark} onRemove={onRemoveMark} />
       </div>
       {(sections[materialIndex] || question.materials) && (
         <div className="question-material-content" id="question-material-panel" key={materialIndex}
@@ -149,7 +145,7 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
           <AnnotatedText key={activeMarkSet.id} indentParagraphs text={sections[materialIndex]?.text ?? question.materials}
             source={`material-${sections[materialIndex]?.label ?? 'all'}`}
             heading={sections[materialIndex]?.label ?? '材料'}
-            label={sections[materialIndex]?.label ?? '材料'} marks={marks} presets={presets} onSave={onSaveMark} onRemove={onRemoveMark} />
+            label={sections[materialIndex]?.label ?? '材料'} marks={marks} noteNumbers={noteNumbers} presets={presets} onSave={onSaveMark} onRemove={onRemoveMark} />
         </div>
       )}
     </aside>

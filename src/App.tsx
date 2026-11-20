@@ -1,3 +1,4 @@
+import { orderReadingMarks, questionReadingSources } from './document/readingOrder'
 import { hasFenbiAssistant, requestFenbiAssistant } from './document/fenbiAssistant'
 /**
  * 申论电脑模拟答题卡 —— 应用外壳
@@ -836,8 +837,8 @@ export default function App() {
     }
   }, [showToast])
 
-  const activeMarks = marks.filter((mark) =>
-    !mark.source.startsWith('prompt-') || mark.source === `prompt-${question?.questionIndex ?? 0}`)
+  const activeMarks = orderReadingMarks(marks, question ? questionReadingSources(question) : [])
+    .filter((mark) => !mark.source.startsWith('prompt-') || mark.source === `prompt-${question?.questionIndex ?? 0}`)
 
   const handleExport = async (format: '图片' | 'Word' | 'PDF') => {
     if (exporting) return
