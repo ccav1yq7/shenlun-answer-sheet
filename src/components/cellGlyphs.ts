@@ -75,7 +75,7 @@ function clamp01(v: number): number {
 /**
  * 「行末共格」专用布局：这一格里既有正文（汉字/数字/压缩标号）又有标点。
  *
- * 普通格子的正文居中画；共格时必须把正文缩小让到左上，把右下腾给标点。
+ * 普通格子的正文居中画。多个标点共格时，正文向左让出一列。
  * 约定：
  *   · mainInk   —— 正文墨迹的目标位置（0~1）
  *   · mainScale / glyphScale —— 相对基准字号（0.76 格）的倍率
@@ -219,6 +219,28 @@ export function buildCellGlyphs(
       }
       out.push({ key: `${oi}`, text, x: 50, y: 50, scale: 1, className: 'glyph' })
     })
+    return out
+  }
+
+  // 顿号、逗号和句号的墨迹很窄。单独共格时只给右下角留出实际需要的宽度。
+  const primary = primaries[0]
+  const mark = trailing[0]
+  if (primaries.length === 1 && !primary.compressed && /^\p{Script=Han}$/u.test(primary.text)
+    && trailing.length === 1 && /^[、，。,.]$/.test(mark)) {
+    const main = glyphInkMetrics(primary.text)
+    const punctuation = glyphInkMetrics(mark)
+    const side = 0.045
+    const gap = 0.025
+    const markScale = 0.74
+    const markWidth = punctuation.inkWidthEm * BASE_FONT_SIZE * markScale
+    const markHeight = punctuation.inkHeightEm * BASE_FONT_SIZE * markScale
+    const markLeft = 1 - side - markWidth
+    const mainWidth = main.inkWidthEm * BASE_FONT_SIZE
+    const mainScale = Math.min(1, (markLeft - side - gap) / mainWidth)
+    const mainHalfWidth = mainWidth * mainScale / 2
+    push(primary.key, primary.text, Math.min(0.5, markLeft - gap - mainHalfWidth),
+      0.5, mainScale, 'glyph glyph--positioned')
+    push('t0', mark, markLeft + markWidth / 2, 0.92 - markHeight / 2, markScale, 'attach')
     return out
   }
 

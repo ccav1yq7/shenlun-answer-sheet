@@ -131,6 +131,22 @@ describe('普通格保持原样', () => {
     expect([g.x, g.y]).toEqual([50, 50])
   })
 
+  it('单个短标点与汉字共格时，汉字保持正常字号，标点靠右下且不重叠', () => {
+    for (const mark of ['、', '，', '。', '.']) {
+      const tokens = new Map([[1, token(1, '字')], [2, token(2, mark, 'PUNCT')]])
+      const [main, punctuation] = buildCellGlyphs(
+        cellOf([normal(1, '字'), squeezed(2, mark)]), tokens, compoundRules,
+      )
+      const body = inkBox(main)
+      const tail = inkBox(punctuation)
+      expect(main.scale).toBe(1)
+      expect(body.x0).toBeGreaterThan(0.04)
+      expect(tail.x0).toBeGreaterThan(body.x1)
+      expect(tail.x1).toBeLessThan(0.96)
+      expect(tail.inkY).toBeGreaterThan(0.75)
+    }
+  })
+
   it('两个标点时逐个排开、互不重叠，且都不压住正文', () => {
     const tokens = new Map([
       [1, token(1, '字')],
