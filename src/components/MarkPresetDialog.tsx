@@ -52,7 +52,7 @@ export function MarkPresetDialog({ presets, onSave, onClose }: {
             </label>
             <span className="mark-preview">
               <mark className={`reading-mark mark-${preset.style}`} data-meaning={preset.label}
-                style={{ '--mark-color': preset.color } as CSSProperties}>{preset.style === 'transition' && <span className="reading-transition-symbol" aria-hidden="true" />}范例文字</mark>
+                style={{ '--mark-color': preset.color } as CSSProperties}>范例文字{preset.style === 'transition' && <span className="reading-transition-symbol" aria-hidden="true" />}</mark>
             </span>
             <button type="button" className="btn" disabled={draft.length === 1} aria-label={`删除样式 ${index + 1}`}
               onClick={() => setDraft((current) => current.filter((item) => item.id !== preset.id))}>删除</button>

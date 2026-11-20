@@ -230,7 +230,7 @@ export function AnnotatedText({ text, source, label, heading, indentParagraphs =
             event.preventDefault()
             openMark(mark, event.currentTarget)
           }
-        }}>{preset.style === 'transition' && <span className="reading-transition-symbol" aria-hidden="true" />}{renderedText(mark.quote)}</mark>,
+        }}>{renderedText(mark.quote)}{preset.style === 'transition' && <span className="reading-transition-symbol" aria-hidden="true" />}</mark>,
     )
     cursor = mark.end
   }
@@ -265,7 +265,7 @@ export function AnnotatedText({ text, source, label, heading, indentParagraphs =
                 }
               }}>
               <span className={`reading-mark mark-${preset.style}`}
-                style={{ '--mark-color': preset.color } as CSSProperties}>{preset.style === 'transition' && <span className="reading-transition-symbol" aria-hidden="true" />}{preset.label}</span>
+                style={{ '--mark-color': preset.color } as CSSProperties}>{preset.label}{preset.style === 'transition' && <span className="reading-transition-symbol" aria-hidden="true" />}</span>
             </button>
           ))}
         </div>
