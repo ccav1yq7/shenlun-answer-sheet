@@ -350,7 +350,7 @@ function PageViewInner({
           </>
         )}
 
-        <div className="sheet-header">
+        <div className={`sheet-header${display.instructions ? '' : ' sheet-header--compact'}`}>
           {isFirst && showTemplate && (
             <div className="absent-box">
               <span>

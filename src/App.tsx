@@ -1341,7 +1341,12 @@ export default function App() {
           blockId={activeBlock.id}
           anchor={{ row: caret.rowIndex, column: caret.column, fraction: caret.fraction }}
           caretOffset={selection.start}
-          layoutKey={`${geometry.layout}-${geometry.cell}`}
+          layoutKey={JSON.stringify([geometry.layout, geometry.cell,
+            currentCard.display.instructions ? 'standard' : [
+              currentCard.display.title, currentCard.display.identity,
+              activeBlock.card && currentCard.display.name ? currentCard.name : '',
+            ],
+          ])}
           enabled
           onCommit={(text, caretOffset) => handleCommit(activeBlock.id, text, caretOffset)}
           onSelectionChange={(start, end) => setSelection({ start, end })}

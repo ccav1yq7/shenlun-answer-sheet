@@ -87,6 +87,15 @@
   margin-top: auto;
 }
 
+.sheet-header--compact {
+  height: auto;
+}
+
+/* The name box follows the visible fields when the instructions are hidden. */
+.sheet-header--compact .notice {
+  margin-top: 2mm;
+}
+
 .sheet-title {
   text-align: center;
   font-size: 8.2mm;
