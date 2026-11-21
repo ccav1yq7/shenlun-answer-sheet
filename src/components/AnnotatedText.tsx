@@ -84,8 +84,9 @@ export function AnnotatedText({ text, source, label, heading, indentParagraphs =
   }
 
   function markSelection(selection: Selection, preset?: MarkPreset) {
-    const existing = anchored.find((mark) => mark.start === selection.start && mark.end === selection.end)
-    if (existing && (!preset || existing.preset?.id === preset.id)) return existing
+    const existing = anchored.find((mark) => mark.start === selection.start && mark.end === selection.end
+      && (!preset || mark.preset?.id === preset.id))
+    if (existing) return existing
     return { ...selection, id: crypto.randomUUID(), source, label, preset: preset ?? presets.find((item) => item.id === notePreferences.presetId) ?? presets[0] }
   }
 
