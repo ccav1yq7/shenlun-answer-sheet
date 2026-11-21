@@ -54,6 +54,9 @@ function Tabs({ label, items, value, onChange, panel }: {
 
 export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPercent, onWidthChange, marks, markSets, activeMarkSet, onMarkSetChange, onSaveMarkSet, presets, notePreferences, onSaveMark, onRemoveMark }: QuestionPaneProps) {
   const [markSetEdit, setMarkSetEdit] = useState<{ create: boolean; name: string } | null>(null)
+  const [showParagraphNumbers, setShowParagraphNumbers] = useState(() => {
+    try { return localStorage.getItem('shenlun-paragraph-numbers') === '1' } catch { return false }
+  })
   const sections = useMemo(() => materialSections(question.materials), [question.materials])
   const questions = question.paper?.questions ?? []
   const questionIndex = question.questionIndex ?? 0
@@ -131,7 +134,14 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
         <button type="submit" className="btn btn--primary">保存方案</button>
         <button type="button" className="btn" onClick={() => setMarkSetEdit(null)}>取消</button>
       </form>}
-      <p className="reading-hint">选中文字可标记或写笔记</p>
+      <div className="reading-options">
+        <p className="reading-hint">选中文字可标记或写笔记</p>
+        <label><input type="checkbox" checked={showParagraphNumbers} onChange={(event) => {
+          const checked = event.target.checked
+          setShowParagraphNumbers(checked)
+          try { localStorage.setItem('shenlun-paragraph-numbers', checked ? '1' : '0') } catch { /* Session only. */ }
+        }} />段落编号</label>
+      </div>
       <div className="question-prompt-content" id="question-prompt-panel"
         role={questions.length > 1 ? 'tabpanel' : undefined}
         aria-labelledby={questions.length > 1 ? `question-prompt-panel-tab-${questionIndex}` : undefined}>
@@ -143,7 +153,7 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
           role={sections.length > 0 ? 'tabpanel' : undefined}
           aria-labelledby={sections.length > 0 ? `question-material-panel-tab-${materialIndex}` : undefined}
           tabIndex={0}>
-          <AnnotatedText key={activeMarkSet.id} indentParagraphs text={sections[materialIndex]?.text ?? question.materials}
+          <AnnotatedText key={activeMarkSet.id} indentParagraphs showParagraphNumbers={showParagraphNumbers} text={sections[materialIndex]?.text ?? question.materials}
             source={`material-${sections[materialIndex]?.label ?? 'all'}`}
             heading={sections[materialIndex]?.label ?? '材料'}
             label={sections[materialIndex]?.label ?? '材料'} marks={marks} noteNumbers={noteNumbers} presets={presets} notePreferences={notePreferences} onSave={onSaveMark} onRemove={onRemoveMark} />

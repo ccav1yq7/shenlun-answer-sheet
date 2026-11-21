@@ -27,6 +27,7 @@ interface AnnotatedTextProps {
   source: string
   label: string
   heading: string
+  showParagraphNumbers?: boolean
   indentParagraphs?: boolean
   marks: ReadingMark[]
   noteNumbers: ReadonlyMap<string, number>
@@ -36,7 +37,7 @@ interface AnnotatedTextProps {
   onRemove: (id: string) => void
 }
 
-export function AnnotatedText({ text, source, label, heading, indentParagraphs = false, marks, noteNumbers, presets, notePreferences, onSave, onRemove }: AnnotatedTextProps) {
+export function AnnotatedText({ text, source, label, heading, indentParagraphs = false, showParagraphNumbers = false, marks, noteNumbers, presets, notePreferences, onSave, onRemove }: AnnotatedTextProps) {
   const passage = useRef<HTMLDivElement>(null)
   const markElements = useRef(new Map<string, HTMLElement>())
   const noteInput = useId()
@@ -125,7 +126,9 @@ export function AnnotatedText({ text, source, label, heading, indentParagraphs =
       if (text === '\n') {
         paragraphStart = true
       } else if (paragraphStart && text.trim()) {
-        segments.push(<span className="reading-paragraph-indent" aria-hidden="true" key={indentIndex++} />)
+        indentIndex++
+        segments.push(<span className="reading-paragraph-indent" aria-hidden="true"
+          data-paragraph={showParagraphNumbers ? `P${indentIndex}` : undefined} key={indentIndex} />)
         paragraphStart = false
       }
       segments.push(text)
