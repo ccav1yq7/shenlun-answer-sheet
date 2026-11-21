@@ -8,7 +8,7 @@
  */
 
 import { memo } from 'react'
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
+import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { buildCellGlyphs, isSpaceCell } from './cellGlyphs'
 import { defaultCardDisplay } from '../document/model'
 import type { AnswerCardDetails } from '../document/model'
@@ -307,6 +307,7 @@ interface PageViewProps {
   caretColumn: number
   caretFraction: number
   card?: AnswerCardDetails
+  review?: ReactNode
   onIdentityChange?: (field: 'candidateName' | 'admissionNumber', value: string) => void
   showTemplate: boolean
   interactive: boolean
@@ -328,6 +329,7 @@ function PageViewInner({
   caretColumn,
   caretFraction,
   card,
+  review,
   onIdentityChange,
   showTemplate,
   interactive,
@@ -425,6 +427,8 @@ function PageViewInner({
           })}
         </div>
 
+        {review}
+
         <div className="sheet-footer">
           <span className="end-note">{isLast ? '全卷到此结束' : ''}</span>
           <span className="page-no">
@@ -449,6 +453,7 @@ export const PageView = memo(PageViewInner)
 
 export interface SheetViewProps {
   doc: DocumentLayout
+  reviewFitsOnLastPage?: boolean
   columns: number
   /** 版式：A3 左右两栏 / A4 单栏 */
   split: boolean
@@ -462,18 +467,27 @@ export interface SheetViewProps {
   caretColumn: number
   caretFraction: number
   card?: AnswerCardDetails
+  review?: ReactNode
   onIdentityChange?: (field: 'candidateName' | 'admissionNumber', value: string) => void
   showTemplate: boolean
   interactive: boolean
   onPointerDown: (blockId: string, rowIndex: number, column: number, fraction: number, shift: boolean) => void
 }
 
-export function SheetView({ doc, ...rest }: SheetViewProps) {
+export function SheetView({ doc, review, reviewFitsOnLastPage, ...rest }: SheetViewProps) {
   return (
     <>
       {doc.pages.map((page) => (
-        <PageView key={page.index} page={page} pageCount={doc.pages.length} {...rest} />
+        <PageView key={page.index} page={page} pageCount={doc.pages.length}
+          review={reviewFitsOnLastPage && page.index === doc.pages.length - 1 ? review : undefined} {...rest} />
       ))}
+      {review && !reviewFitsOnLastPage && (
+        <div className="page-wrap">
+          <div className={`sheet-page sheet-page--review-only${rest.showTemplate ? '' : ' sheet-page--bare'}`}>
+            {review}
+          </div>
+        </div>
+      )}
     </>
   )
 }

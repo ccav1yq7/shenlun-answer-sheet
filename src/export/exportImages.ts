@@ -15,9 +15,10 @@ async function* captureGridPages(source: HTMLElement) {
   staging.style.cssText = 'position:fixed;left:-100000px;top:0;pointer-events:none;'
   source.parentElement?.append(staging)
   try {
-    const pages = Array.from(source.querySelectorAll<HTMLElement>('.sheet-page'), (page) => {
+    const pages = Array.from(source.querySelectorAll<HTMLElement>('.sheet-page:not(.sheet-page--review-only)'), (page) => {
       const clone = page.cloneNode(true) as HTMLElement
       clone.style.boxShadow = 'none'
+      clone.querySelector('.answer-card-review')?.remove()
       const identityFields = page.querySelectorAll<HTMLInputElement>('.sheet-identity-input')
       clone.querySelectorAll<HTMLInputElement>('.sheet-identity-input').forEach((field, index) => {
         const text = document.createElement('span')

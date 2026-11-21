@@ -246,6 +246,11 @@ export default function App() {
     [sheet.blocks, profile, geometry],
   )
 
+  const lastPage = doc.pages[doc.pages.length - 1]
+  const lastPageRows = Math.max(0, ...(lastPage?.panels.map((panel) => panel.rows.length) ?? []))
+  const reviewFitsOnLastPage = Boolean(lastPage
+    && geometry.panelHeight(lastPage.index) - geometry.panelHeading - lastPageRows * geometry.cell >= 32)
+
   const tokensByBlockId = useMemo(
     () => new Map(doc.blocks.map((b) => [b.blockId, new Map(b.tokens.map((t) => [t.id, t]))])),
     [doc],
@@ -1300,6 +1305,15 @@ export default function App() {
                 caretRow={caret.rowIndex}
                 caretColumn={caret.column}
                 caretFraction={caret.fraction}
+                reviewFitsOnLastPage={reviewFitsOnLastPage}
+                review={currentCard.display.review && (
+                  <section className="answer-card-review" aria-labelledby="answer-review-title">
+                    <label id="answer-review-title" htmlFor="answer-review">复盘笔记</label>
+                    <textarea id="answer-review" ref={reviewRef} value={currentCard.review}
+                      placeholder="记下这次漏掉的要点、表达问题，或下次要改进的地方"
+                      onChange={(event) => updateBlock(activeBlock.id, { card: { ...currentCard, review: event.target.value } })} />
+                  </section>
+                )}
                 card={activeBlock.card}
                 onIdentityChange={(field, value) => updateBlock(activeBlock.id, { card: { ...currentCard, [field]: value } })}
                 showTemplate={sheet.showTemplate}
@@ -1308,14 +1322,6 @@ export default function App() {
                 interactive
                 onPointerDown={handlePointerDown}
               />
-              {currentCard.display.review && (
-                <section className="answer-card-review" aria-labelledby="answer-review-title">
-                  <label id="answer-review-title" htmlFor="answer-review">复盘笔记</label>
-                  <textarea id="answer-review" ref={reviewRef} value={currentCard.review}
-                    placeholder="记下这次漏掉的要点、表达问题，或下次要改进的地方"
-                    onChange={(event) => updateBlock(activeBlock.id, { card: { ...currentCard, review: event.target.value } })} />
-                </section>
-              )}
             </div>
           </div>
         </div>

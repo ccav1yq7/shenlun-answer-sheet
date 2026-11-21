@@ -1097,35 +1097,6 @@ select:focus-visible,
 }
 .answer-card-display label { display: flex; gap: 6px; align-items: center; }
 
-.answer-card-review {
-  align-self: stretch;
-  width: var(--page-w);
-  padding: 5mm 7mm;
-  background: var(--paper);
-  border: 1px solid #d7dce8;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px #18244214;
-}
-.answer-card-review label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 16px;
-  font-weight: 650;
-}
-.answer-card-review textarea {
-  display: block;
-  width: 100%;
-  min-height: 125px;
-  padding: 10px;
-  border: 1px solid #cdd5e5;
-  border-radius: 6px;
-  background: #fafbfe;
-  color: inherit;
-  font: inherit;
-  line-height: 1.7;
-  resize: vertical;
-}
-
 .answer-card-identity {
   display: grid;
   grid-template-columns: 1fr 1fr;
