@@ -195,7 +195,6 @@ export default function App() {
   const [keepExportFormat, setKeepExportFormat] = useState(defaults.keepExportFormat ?? true)
   const [exporting, setExporting] = useState(false)
   const [cardDialog, setCardDialog] = useState<'add' | 'edit' | null>(null)
-  const reviewRef = useRef<HTMLTextAreaElement>(null)
   const exportSourceRef = useRef<HTMLDivElement | null>(null)
   const printRef = useRef<HTMLDivElement | null>(null)
   const viewportRef = useRef<HTMLDivElement | null>(null)
@@ -1299,12 +1298,6 @@ export default function App() {
             </label>
             <button type="button" className="btn" onClick={() => setCardDialog('add')}>＋ 新增答题卡</button>
             <button type="button" className="btn" onClick={() => setCardDialog('edit')}>答题卡设置</button>
-            {currentCard.display.review && (
-              <button type="button" className="btn" onClick={() => {
-                reviewRef.current?.scrollIntoView({ block: 'center' })
-                reviewRef.current?.focus({ preventScroll: true })
-              }}>复盘笔记</button>
-            )}
           </div>
           <div className="toolbar-row stats">
             <span className="stat">
@@ -1361,7 +1354,7 @@ export default function App() {
                 review={currentCard.display.review && (
                   <section className="answer-card-review" aria-labelledby="answer-review-title">
                     <label id="answer-review-title" htmlFor="answer-review">复盘笔记</label>
-                    <textarea id="answer-review" ref={reviewRef} value={currentCard.review}
+                    <textarea id="answer-review" value={currentCard.review}
                       placeholder="记下这次漏掉的要点、表达问题，或下次要改进的地方"
                       onChange={(event) => updateBlock(activeBlock.id, { card: { ...currentCard, review: event.target.value } })} />
                   </section>
