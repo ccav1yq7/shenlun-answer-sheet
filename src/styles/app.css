@@ -610,6 +610,20 @@ select:focus-visible,
   min-height: 0;
   max-height: 45%;
   overflow: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f6f8fb;
+}
+
+.question-prompt-content .reading-passage {
+  margin-bottom: 0;
+}
+
+.question-prompt-content + .question-material-content {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
 }
 
 .question-material-content {
