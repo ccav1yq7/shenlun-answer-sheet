@@ -46,7 +46,6 @@ export function AnnotatedText({ text, source, label, heading, indentParagraphs =
   const [overlay, setOverlay] = useState<Overlay | null>(null)
   const [kind, setKind] = useState<NoteKind>(notePreferences.kind)
   const [note, setNote] = useState('')
-  const [message, setMessage] = useState('')
   const ownMarks = marks.filter((mark) => mark.source === source)
   const activeMark = overlay?.type === 'note' || overlay?.type === 'edit' ? overlay.mark : null
   const draftMark = activeMark && overlay?.type === 'edit' && !ownMarks.some((mark) => mark.id === activeMark.id)
@@ -82,22 +81,16 @@ export function AnnotatedText({ text, source, label, heading, indentParagraphs =
     if (!quote) return
     const start = sourceText(prefix).length + raw.length - raw.trimStart().length
     setOverlay({ type: 'selection', anchor: range.cloneRange(), selection: { start, end: start + quote.length, quote } })
-    setMessage('')
   }
 
   function markSelection(selection: Selection, preset?: MarkPreset) {
     const existing = anchored.find((mark) => mark.start === selection.start && mark.end === selection.end)
-    if (existing) return preset ? { ...existing, preset } : existing
-    if (anchored.some((mark) => mark.start < selection.end && mark.end > selection.start)) {
-      setMessage('这段文字与已有标记重叠，可点原标记编辑。')
-      return null
-    }
+    if (existing && (!preset || existing.preset?.id === preset.id)) return existing
     return { ...selection, id: crypto.randomUUID(), source, label, preset: preset ?? presets.find((item) => item.id === notePreferences.presetId) ?? presets[0] }
   }
 
   function close() {
     setOverlay(null)
-    setMessage('')
   }
 
   function beginNote(mark: ReadingMark, anchor: Element | Range) {
@@ -205,31 +198,43 @@ export function AnnotatedText({ text, source, label, heading, indentParagraphs =
     }
   }
 
+  const boundaries = [...new Set(anchored.flatMap((mark) => [mark.start, mark.end]))].sort((a, b) => a - b)
   let cursor = 0
-  for (const mark of anchored) {
-    if (mark.start < cursor) continue
-    const preset = validMarkPreset(mark.preset) ? mark.preset : defaultMarkPresets[0]
-    const number = noteNumbers.get(mark.id)
-    const active = activeMark?.id === mark.id || focusedNote === mark.id
-    appendSource(cursor, mark.start)
-    fragments.push(
-      <mark key={mark.id} ref={(element) => {
+  for (let index = 0; index < boundaries.length - 1; index++) {
+    const start = boundaries[index]
+    const end = boundaries[index + 1]
+    const covering = anchored.filter((mark) => mark.start <= start && end <= mark.end)
+    if (!covering.length) continue
+    appendSource(cursor, start)
+    const content = covering.reduceRight<ReactNode>((child, mark) => {
+      const preset = validMarkPreset(mark.preset) ? mark.preset : defaultMarkPresets[0]
+      const first = start === mark.start
+      const last = end === mark.end
+      const number = last ? noteNumbers.get(mark.id) : undefined
+      const active = activeMark?.id === mark.id || focusedNote === mark.id
+      return <mark key={`${mark.id}-${start}`} ref={first ? (element) => {
         if (element) markElements.current.set(mark.id, element)
         else markElements.current.delete(mark.id)
-      }} className={`reading-mark mark-${preset.style}${number ? ' reading-mark--note' : ''}${active ? ' reading-mark--active' : ''}`}
-        data-meaning={preset.label} data-note-number={number} style={{ '--mark-color': preset.color } as CSSProperties}
-        tabIndex={0} role="button" aria-expanded={mark.note ? undefined : active} aria-controls={mark.note ? `${noteInput}-note-${mark.id}` : undefined} aria-label={`${mark.note ? '查看批注' : '查看标记'}：${mark.quote}`}
+      } : undefined}
+        className={`reading-mark mark-${preset.style}${number ? ' reading-mark--note' : ''}${active ? ' reading-mark--active' : ''}`}
+        data-meaning={first ? preset.label : undefined} data-note-number={number}
+        style={{ '--mark-color': preset.color } as CSSProperties}
+        tabIndex={first ? 0 : undefined} role={first ? 'button' : undefined}
+        aria-label={first ? `${mark.note ? '查看批注' : '查看标记'}：${mark.quote}` : undefined}
         onClick={(event) => {
-          if (window.getSelection()?.isCollapsed) openMark(mark, event.currentTarget)
+          if (!window.getSelection()?.isCollapsed) return
+          event.stopPropagation()
+          openMark(mark, markElements.current.get(mark.id) ?? event.currentTarget)
         }}
         onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
+          if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
             event.preventDefault()
             openMark(mark, event.currentTarget)
           }
-        }}>{renderedText(mark.quote)}{preset.style === 'transition' && <span className="reading-transition-symbol" aria-hidden="true" />}</mark>,
-    )
-    cursor = mark.end
+        }}>{child}{last && preset.style === 'transition' && <span className="reading-transition-symbol" aria-hidden="true" />}</mark>
+    }, renderedText(text.slice(start, end)))
+    fragments.push(content)
+    cursor = end
   }
   appendSource(cursor, text.length)
 
@@ -270,7 +275,6 @@ export function AnnotatedText({ text, source, label, heading, indentParagraphs =
           const mark = markSelection(overlay.selection)
           if (mark) beginNote(mark, overlay.anchor)
         }}>写批注</button>
-        {message && <p className="reading-message" role="status">{message}</p>}
       </>}
       {overlay.type === 'edit' && <form className="reading-note-editor" onSubmit={saveNote}>
         <div className="reading-card-header">
