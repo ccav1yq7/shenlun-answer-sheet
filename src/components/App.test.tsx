@@ -134,12 +134,21 @@ describe('交互验收：第一步到第六步', () => {
 })
 
 describe('中文输入法', () => {
-  it('组合输入期间不提交模型，答题卡不显示拼音', () => {
+  it('组合拼音显示在提示条里，更新时仍不提交答题卡', () => {
     const { container, textarea } = setup()
     fireEvent.compositionStart(textarea)
+    fireEvent.compositionUpdate(textarea, { data: 'ni' })
+    const preview = container.querySelector('.composition-hint')!
+    expect(preview).not.toHaveAttribute('hidden')
+    expect(preview).toHaveTextContent('ni')
+    fireEvent.compositionUpdate(textarea, { data: 'nihao' })
     type(textarea, 'nihao')
-    // 组合中：模型未更新
+    expect(preview).toHaveTextContent('nihao')
     expect(allCells(container).filter(Boolean)).toHaveLength(0)
+    type(textarea, '你好')
+    fireEvent.compositionEnd(textarea)
+    expect(preview).toHaveAttribute('hidden')
+    expect(allCells(container).filter(Boolean)).toEqual(['你', '好'])
   })
 
   it('组合结束才把最终汉字写入方格，且不重复不丢失', () => {

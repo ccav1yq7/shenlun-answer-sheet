@@ -74,6 +74,8 @@ export const EditorSurface = forwardRef<EditorSurfaceHandle, EditorSurfaceProps>
   ref,
 ) {
   const taRef = useRef<HTMLTextAreaElement | null>(null)
+  const previewRef = useRef<HTMLDivElement>(null)
+  const [preedit, setPreedit] = useState<{ blockId: string; text: string } | null>(null)
   const composingRef = useRef(false)
   const [composing, setComposing] = useState(false)
 
@@ -141,7 +143,11 @@ export const EditorSurface = forwardRef<EditorSurfaceHandle, EditorSurfaceProps>
     const position = (revealCaret: boolean) => {
       const selector = `[data-block="${CSS.escape(blockId)}"] [data-row="${anchor.row}"][data-col="${anchor.column}"]`
       const cell = document.querySelector(selector) as HTMLElement | null
-      if (!cell) return
+      const preview = previewRef.current
+      if (!cell) {
+        if (preview) preview.style.visibility = 'hidden'
+        return
+      }
       let rect = cell.getBoundingClientRect()
 
       if (revealCaret) {
@@ -164,6 +170,17 @@ export const EditorSurface = forwardRef<EditorSurfaceHandle, EditorSurfaceProps>
       const y = rect.top + rect.height / 2
       ta.style.left = `${Math.max(4, Math.min(window.innerWidth - 8, x))}px`
       ta.style.top = `${Math.max(4, Math.min(window.innerHeight - 8, y))}px`
+      if (preview) {
+        const viewport = cell.closest('.sheet-viewport')?.getBoundingClientRect()
+        const visible = !viewport || (x >= viewport.left && x <= viewport.right
+          && y >= viewport.top && y <= viewport.bottom)
+        preview.style.visibility = visible ? 'visible' : 'hidden'
+        preview.dataset.align = x > window.innerWidth - 256 && x > window.innerWidth / 2 ? 'end' : 'start'
+        preview.style.left = `${Math.max(8, Math.min(window.innerWidth - 8, x))}px`
+        const availableWidth = preview.dataset.align === 'end' ? x - 8 : window.innerWidth - x - 8
+        preview.style.setProperty('--preedit-room', `${Math.max(0, availableWidth)}px`)
+        preview.style.top = `${Math.max(44, rect.top - 7)}px`
+      }
     }
 
     let raf = 0
@@ -216,6 +233,8 @@ export const EditorSurface = forwardRef<EditorSurfaceHandle, EditorSurfaceProps>
         const ta = taRef.current
         if (!ta) return
         composingRef.current = false
+        setComposing(false)
+        setPreedit(null)
         ta.value = next
         const pos = Math.max(0, Math.min(caret, next.length))
         ta.focus({ preventScroll: true })
@@ -402,14 +421,21 @@ export const EditorSurface = forwardRef<EditorSurfaceHandle, EditorSurfaceProps>
     commitFromTextarea()
   }, [commitFromTextarea])
 
-  const handleCompositionStart = useCallback(() => {
+  const handleCompositionStart = useCallback((event: React.CompositionEvent<HTMLTextAreaElement>) => {
     composingRef.current = true
     setComposing(true)
-  }, [])
+    setPreedit(event.data ? { blockId, text: event.data } : null)
+  }, [blockId])
+
+  const handleCompositionUpdate = useCallback((event: React.CompositionEvent<HTMLTextAreaElement>) => {
+    if (!composingRef.current || valueBlockRef.current !== blockId) return
+    setPreedit(event.data ? { blockId, text: event.data } : null)
+  }, [blockId])
 
   const handleCompositionEnd = useCallback(() => {
     composingRef.current = false
     setComposing(false)
+    setPreedit(null)
     // 组合结束才把最终文本提交给模型
     commitFromTextarea()
   }, [commitFromTextarea])
@@ -421,7 +447,7 @@ export const EditorSurface = forwardRef<EditorSurfaceHandle, EditorSurfaceProps>
 
   const placeholderStyle = useMemo(() => ({ tabSize: 4 }), [])
 
-  return (
+  return (<>
     <textarea
       ref={taRef}
       className="editor-surface"
@@ -440,9 +466,16 @@ export const EditorSurface = forwardRef<EditorSurfaceHandle, EditorSurfaceProps>
       onSelect={handleSelect}
       onClick={handleSelect}
       onCompositionStart={handleCompositionStart}
+      onCompositionUpdate={handleCompositionUpdate}
       onCompositionEnd={handleCompositionEnd}
+      onBlur={() => setPreedit(null)}
       onFocus={onFocusRequest}
       data-composing={composing ? '1' : '0'}
     />
-  )
+    <div ref={previewRef} className="composition-hint" aria-hidden="true"
+      hidden={!enabled || !composing || preedit?.blockId !== blockId}>
+      <span className="composition-hint-label">输入中</span>
+      <span className="composition-hint-text">{preedit?.text}</span>
+    </div>
+  </>)
 })

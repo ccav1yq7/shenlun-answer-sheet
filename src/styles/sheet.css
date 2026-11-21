@@ -462,20 +462,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 中文输入法预编辑串的浮层提示 */
-.composition-hint {
-  position: absolute;
-  font-family: var(--font-kai);
-  font-size: calc(var(--cell) * 0.7);
-  color: #2563eb;
-  border-bottom: 0.3mm solid #2563eb;
-  padding: 0 0.4mm;
-  pointer-events: none;
-  white-space: nowrap;
-  z-index: 5;
-  background: rgba(255, 255, 255, 0.92);
-}
-
 /* --------------------------------------------------------------------------
    模板可关闭
    -------------------------------------------------------------------------- */
