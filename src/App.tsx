@@ -19,7 +19,10 @@ import { readReadingPreferences, syncMarkPresets } from './document/readingMarks
 import type { ReadingMark } from './components/AnnotatedText'
 import { AnswerCardDialog } from './components/AnswerCardDialog'
 import { PracticeDialog } from './components/PracticeDialog'
-import { readPracticeDefaults, storePractice, writePracticeDefaults } from './document/practiceStore'
+import {
+  getPracticeDirectory, readPracticeDefaults, readPracticeLocation, reloadPractice,
+  rememberPracticeLocation, storePractice, writePracticeDefaults,
+} from './document/practiceStore'
 import type { DirectoryHandle, PracticeEntry, PracticePreferences, PracticeSnapshot, ReadingMarkSet, SavedPractice } from './document/practiceStore'
 import { QuestionPane } from './components/QuestionPane'
 import { QuestionImport } from './components/QuestionImport'
@@ -94,6 +97,11 @@ export default function App() {
   })
   const [practiceDialog, setPracticeDialog] = useState<'save' | 'list' | null>(() =>
     new URLSearchParams(window.location.search).get('practice') === '1' ? 'list' : null)
+  const resumeLocation = useRef(
+    new URLSearchParams(window.location.search).get('practice') === '1'
+    || new URLSearchParams(window.location.hash.slice(1)).has('fenbi-question')
+      ? undefined : readPracticeLocation(),
+  )
   const [currentPractice, setCurrentPractice] = useState<PracticeEntry | null>(null)
   const practiceDirectory = useRef<DirectoryHandle>()
   const saveJob = useRef<Promise<void> | null>(null)
@@ -152,6 +160,7 @@ export default function App() {
     const payload = params.get('fenbi-question')
     if (payload === null) return
     params.delete('fenbi-question')
+    rememberPracticeLocation(null)
     const hash = params.toString()
     window.history.replaceState(null, '', window.location.pathname + window.location.search + (hash ? `#${hash}` : ''))
     try {
@@ -426,6 +435,7 @@ export default function App() {
     await storePractice(record, directory, existing ?? undefined)
     practiceDirectory.current = record.storage === 'folder' ? directory : undefined
     setCurrentPractice(record)
+    rememberPracticeLocation(record)
     setAutosaveState('idle')
     setAutosaveError('')
     setPracticeDialog(null)
@@ -436,6 +446,10 @@ export default function App() {
     const hasWork = question || marks.length || sheet.blocks.some((block) => block.text.trim())
     if (hasWork && (!currentPractice || unsaved)
       && !window.confirm('当前练习有未保存的内容。继续打开已保存的练习吗？')) return
+    applyPractice(record, directory)
+  }
+
+  function applyPractice(record: PracticeEntry, directory?: DirectoryHandle) {
     const saved = record.snapshot
     const block = saved.sheet.blocks.find((item) => item.id === saved.activeBlockId) ?? saved.sheet.blocks[0]
     setSheet(saved.sheet)
@@ -466,8 +480,45 @@ export default function App() {
     setAutosaveError('')
     setCurrentPractice(record)
     setPracticeDialog(null)
+    rememberPracticeLocation(record)
     showToast('已打开「' + record.name + '」')
   }
+
+  useEffect(() => {
+    const location = resumeLocation.current
+    if (!location) return
+    let cancelled = false
+    const cancelRestore = () => { cancelled = true }
+    window.addEventListener('pointerdown', cancelRestore, true)
+    window.addEventListener('keydown', cancelRestore, true)
+    const stopListening = () => {
+      window.removeEventListener('pointerdown', cancelRestore, true)
+      window.removeEventListener('keydown', cancelRestore, true)
+    }
+    void (async () => {
+      try {
+        const directory = location.storage === 'folder' ? await getPracticeDirectory() : undefined
+        const record = await reloadPractice(location, directory)
+        if (!cancelled) applyPractice(record, directory)
+      } catch (error) {
+        if (cancelled) return
+        if (location.storage === 'browser' || (error instanceof DOMException && error.name === 'NotFoundError')) {
+          rememberPracticeLocation(null)
+        }
+        setPracticeDialog('list')
+        showToast(location.storage === 'folder'
+          ? '无法恢复上次练习，请在「我的练习」检查本地文件夹权限'
+          : '上次的练习无法打开，请从列表选择')
+      } finally {
+        stopListening()
+      }
+    })()
+    return () => {
+      cancelRestore()
+      stopListening()
+    }
+    // The saved location is captured before handling a fresh Fenbi import.
+  }, [])
 
   function saveDefaults() {
     const preferences = practicePreferences(activeCapacity)
@@ -1388,6 +1439,7 @@ export default function App() {
               onUpdate={(previous, updated) => {
                 if (currentPractice?.id === previous.id && currentPractice.storage === previous.storage) {
                   setCurrentPractice(updated)
+                  rememberPracticeLocation(updated)
                 }
               }}
               onClose={() => { setPracticeDialog(null); setOpenWebdav(false) }} />
@@ -1405,7 +1457,10 @@ export default function App() {
                     setMarkSets([{ id: 'original', name: '第 1 套标记', marks: [] }])
                     setMarkSetId('original')
                   }
-                  if (imported.paper && question) setCurrentPractice(null)
+                  if (imported.paper && question) {
+                    setCurrentPractice(null)
+                    rememberPracticeLocation(null)
+                  }
                   const selected = imported.paper?.questions[imported.questionIndex ?? 0]
                   if (selected) updateBlock(activeBlock.id, {
                     capacity: questionCapacity(selected.prompt),

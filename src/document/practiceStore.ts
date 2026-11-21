@@ -225,7 +225,29 @@ async function checkedDirectory(directory: DirectoryHandle | undefined) {
   return directory
 }
 
-export async function reloadPractice(entry: PracticeEntry, directory?: DirectoryHandle): Promise<PracticeEntry> {
+type PracticeLocation = Pick<PracticeEntry, 'id' | 'storage'>
+const resumeKey = 'shenlun-current-practice-v1'
+
+export function readPracticeLocation(): PracticeLocation | undefined {
+  try {
+    const entry = JSON.parse(sessionStorage.getItem(resumeKey) ?? 'null')
+    if (typeof entry?.id === 'string' && validId.test(entry.id)
+      && (entry.storage === 'browser' || entry.storage === 'folder')) return entry
+  } catch {
+    // The workspace can open even when session storage is unavailable.
+  }
+}
+
+export function rememberPracticeLocation(entry: PracticeLocation | null) {
+  try {
+    if (entry) sessionStorage.setItem(resumeKey, JSON.stringify({ id: entry.id, storage: entry.storage }))
+    else sessionStorage.removeItem(resumeKey)
+  } catch {
+    // Reopening the record from the practice list remains available.
+  }
+}
+
+export async function reloadPractice(entry: PracticeLocation, directory?: DirectoryHandle): Promise<PracticeEntry> {
   if (entry.storage === 'browser') {
     const record = readPractices().find(({ id }) => id === entry.id)
     if (!record) throw new Error('这份练习已不存在，请刷新列表')
