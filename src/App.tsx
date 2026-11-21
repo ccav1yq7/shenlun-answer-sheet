@@ -15,7 +15,7 @@ import { EditorSurface } from './components/EditorSurface'
 import type { EditorSurfaceHandle } from './components/EditorSurface'
 import { SheetView } from './components/SheetView'
 import { MarkPresetDialog } from './components/MarkPresetDialog'
-import { readMarkPresets, syncMarkPresets } from './document/readingMarks'
+import { readReadingPreferences, syncMarkPresets } from './document/readingMarks'
 import type { ReadingMark } from './components/AnnotatedText'
 import { AnswerCardDialog } from './components/AnswerCardDialog'
 import { PracticeDialog } from './components/PracticeDialog'
@@ -101,7 +101,8 @@ export default function App() {
   const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'failed'>('idle')
   const [autosaveError, setAutosaveError] = useState('')
   const [activeBlockId, setActiveBlockId] = useState<string>(() => sheet.blocks[0].id)
-  const [markPresets, setMarkPresets] = useState(readMarkPresets)
+  const [readingPreferences, setReadingPreferences] = useState(readReadingPreferences)
+  const { presets: markPresets, note: notePreferences } = readingPreferences
   const [showMarkSettings, setShowMarkSettings] = useState(false)
   const [markSets, setMarkSets] = useState<ReadingMarkSet[]>(() => [{ id: 'original', name: '第 1 套标记', marks: [] }])
   const [markSetId, setMarkSetId] = useState('original')
@@ -999,7 +1000,7 @@ export default function App() {
             <button type="button" className="btn" onClick={saveDefaults}
               title="保存当前字数、列数、版式、缩放、阅读栏宽度和导出选项">保存为默认设置</button>
             <span className="toolbar-sep" />
-            <button type="button" className="btn" onClick={() => setShowMarkSettings(true)}>标记偏好</button>
+            <button type="button" className="btn" onClick={() => setShowMarkSettings(true)}>标记与批注偏好</button>
             {assistantAvailable && <details className="assistant-settings">
               <summary className="btn">粉笔助手 · 高级设置</summary>
               <div className="assistant-settings-panel">
@@ -1007,7 +1008,7 @@ export default function App() {
                   setOpenWebdav(true)
                   void showPracticeDialog('list')
                 }}>WebDAV 同步</button>
-                <button type="button" className="btn" onClick={() => setShowMarkSettings(true)}>标记偏好</button>
+                <button type="button" className="btn" onClick={() => setShowMarkSettings(true)}>标记与批注偏好</button>
                 <button type="button" className="btn" onClick={saveDefaults}>保存答题偏好</button>
               </div>
             </details>}
@@ -1285,7 +1286,7 @@ export default function App() {
           {question && showQuestion && (
             <QuestionPane question={question} onQuestionChange={selectImportedQuestion}
               zoomOffset={zoomOffset} widthPercent={readerWidth} onWidthChange={setReaderWidth}
-              marks={marks} presets={markPresets} markSets={markSets} activeMarkSet={activeMarkSet}
+              marks={marks} presets={markPresets} notePreferences={notePreferences} markSets={markSets} activeMarkSet={activeMarkSet}
               onMarkSetChange={setMarkSetId} onSaveMarkSet={saveMarkSet}
               onSaveMark={(mark) => updateReadingMarks((current) => current.some((item) => item.id === mark.id)
                 ? current.map((item) => item.id === mark.id ? mark : item)
@@ -1371,9 +1372,9 @@ export default function App() {
             } : currentCard} onSave={saveAnswerCard} onClose={() => setCardDialog(null)} />
           )}
           {showMarkSettings && (
-            <MarkPresetDialog presets={markPresets}
-              onSave={(presets) => {
-                setMarkPresets(presets)
+            <MarkPresetDialog presets={markPresets} notePreferences={notePreferences}
+              onSave={(presets, note) => {
+                setReadingPreferences({ presets, note })
                 setMarkSets((sets) => sets.map((set) => ({ ...set, marks: syncMarkPresets(set.marks, presets) })))
                 setShowMarkSettings(false)
               }}

@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react'
 import { AnnotatedText } from './AnnotatedText'
-import type { MarkPreset } from '../document/readingMarks'
+import type { MarkPreset, NotePreferences } from '../document/readingMarks'
 import { materialSections, orderReadingMarks, questionReadingSources } from '../document/readingOrder'
 import type { ReadingMark } from './AnnotatedText'
 import type { ReadingMarkSet } from '../document/practiceStore'
@@ -19,6 +19,7 @@ interface QuestionPaneProps {
   onMarkSetChange: (id: string) => void
   onSaveMarkSet: (name: string, create: boolean) => void
   presets: MarkPreset[]
+  notePreferences: NotePreferences
   onSaveMark: (mark: ReadingMark) => void
   onRemoveMark: (id: string) => void
 }
@@ -51,7 +52,7 @@ function Tabs({ label, items, value, onChange, panel }: {
   </div>
 }
 
-export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPercent, onWidthChange, marks, markSets, activeMarkSet, onMarkSetChange, onSaveMarkSet, presets, onSaveMark, onRemoveMark }: QuestionPaneProps) {
+export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPercent, onWidthChange, marks, markSets, activeMarkSet, onMarkSetChange, onSaveMarkSet, presets, notePreferences, onSaveMark, onRemoveMark }: QuestionPaneProps) {
   const [markSetEdit, setMarkSetEdit] = useState<{ create: boolean; name: string } | null>(null)
   const sections = useMemo(() => materialSections(question.materials), [question.materials])
   const questions = question.paper?.questions ?? []
@@ -135,7 +136,7 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
         role={questions.length > 1 ? 'tabpanel' : undefined}
         aria-labelledby={questions.length > 1 ? `question-prompt-panel-tab-${questionIndex}` : undefined}>
         <AnnotatedText key={`${activeMarkSet.id}-prompt-${questionIndex}`} text={prompt} source={`prompt-${questionIndex}`}
-          heading="题干" label={questions[questionIndex]?.label ?? '题干'} marks={marks} noteNumbers={noteNumbers} presets={presets} onSave={onSaveMark} onRemove={onRemoveMark} />
+          heading="题干" label={questions[questionIndex]?.label ?? '题干'} marks={marks} noteNumbers={noteNumbers} presets={presets} notePreferences={notePreferences} onSave={onSaveMark} onRemove={onRemoveMark} />
       </div>
       {(sections[materialIndex] || question.materials) && (
         <div className="question-material-content" id="question-material-panel" key={materialIndex}
@@ -145,7 +146,7 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
           <AnnotatedText key={activeMarkSet.id} indentParagraphs text={sections[materialIndex]?.text ?? question.materials}
             source={`material-${sections[materialIndex]?.label ?? 'all'}`}
             heading={sections[materialIndex]?.label ?? '材料'}
-            label={sections[materialIndex]?.label ?? '材料'} marks={marks} noteNumbers={noteNumbers} presets={presets} onSave={onSaveMark} onRemove={onRemoveMark} />
+            label={sections[materialIndex]?.label ?? '材料'} marks={marks} noteNumbers={noteNumbers} presets={presets} notePreferences={notePreferences} onSave={onSaveMark} onRemove={onRemoveMark} />
         </div>
       )}
     </aside>

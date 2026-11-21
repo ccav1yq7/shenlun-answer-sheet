@@ -1,12 +1,9 @@
 import { useId, useRef, useState } from 'react'
 import type { CSSProperties, FormEvent, ReactNode } from 'react'
-import { defaultMarkPresets, markStyles, validMarkPreset } from '../document/readingMarks'
-import type { MarkPreset } from '../document/readingMarks'
+import { defaultMarkPresets, markStyles, noteKinds, validMarkPreset } from '../document/readingMarks'
+import type { MarkPreset, NoteKind, NotePreferences } from '../document/readingMarks'
 import { anchorReadingMark } from '../document/readingOrder'
 import { ReadingPopover } from './ReadingPopover'
-
-export const noteKinds = ['提炼', '改写', '随记'] as const
-export type NoteKind = typeof noteKinds[number]
 
 export interface ReadingMark {
   id: string
@@ -34,18 +31,19 @@ interface AnnotatedTextProps {
   marks: ReadingMark[]
   noteNumbers: ReadonlyMap<string, number>
   presets: MarkPreset[]
+  notePreferences: NotePreferences
   onSave: (mark: ReadingMark) => void
   onRemove: (id: string) => void
 }
 
-export function AnnotatedText({ text, source, label, heading, indentParagraphs = false, marks, noteNumbers, presets, onSave, onRemove }: AnnotatedTextProps) {
+export function AnnotatedText({ text, source, label, heading, indentParagraphs = false, marks, noteNumbers, presets, notePreferences, onSave, onRemove }: AnnotatedTextProps) {
   const passage = useRef<HTMLDivElement>(null)
   const markElements = useRef(new Map<string, HTMLElement>())
   const noteInput = useId()
   const inlineNotes = useRef(new Map<string, HTMLElement>())
   const [focusedNote, setFocusedNote] = useState<string | null>(null)
   const [overlay, setOverlay] = useState<Overlay | null>(null)
-  const [kind, setKind] = useState<NoteKind>('提炼')
+  const [kind, setKind] = useState<NoteKind>(notePreferences.kind)
   const [note, setNote] = useState('')
   const [message, setMessage] = useState('')
   const ownMarks = marks.filter((mark) => mark.source === source)
@@ -93,7 +91,7 @@ export function AnnotatedText({ text, source, label, heading, indentParagraphs =
       setMessage('这段文字与已有标记重叠，可点原标记编辑。')
       return null
     }
-    return { ...selection, id: crypto.randomUUID(), source, label, preset: preset ?? presets[0] }
+    return { ...selection, id: crypto.randomUUID(), source, label, preset: preset ?? presets.find((item) => item.id === notePreferences.presetId) ?? presets[0] }
   }
 
   function close() {
@@ -104,7 +102,7 @@ export function AnnotatedText({ text, source, label, heading, indentParagraphs =
   function beginNote(mark: ReadingMark, anchor: Element | Range) {
     setOverlay({ type: 'edit', anchor, mark })
     setNote(mark.note?.text ?? '')
-    setKind(mark.note?.kind ?? '提炼')
+    setKind(mark.note?.kind ?? notePreferences.kind)
     window.getSelection()?.removeAllRanges()
   }
 

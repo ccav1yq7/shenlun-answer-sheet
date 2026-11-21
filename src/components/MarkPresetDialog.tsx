@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { markStyles, validMarkPreset, writeMarkPresets } from '../document/readingMarks'
-import type { MarkPreset } from '../document/readingMarks'
+import { markStyles, noteKinds, validMarkPreset, writeReadingPreferences } from '../document/readingMarks'
+import type { MarkPreset, NoteKind, NotePreferences } from '../document/readingMarks'
 
-export function MarkPresetDialog({ presets, onSave, onClose }: {
+export function MarkPresetDialog({ presets, notePreferences, onSave, onClose }: {
   presets: MarkPreset[]
-  onSave: (presets: MarkPreset[]) => void
+  notePreferences: NotePreferences
+  onSave: (presets: MarkPreset[], note: NotePreferences) => void
   onClose: () => void
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const [draft, setDraft] = useState(presets)
+  const [note, setNote] = useState(notePreferences)
+  const defaultPreset = draft.find((preset) => preset.id === note.presetId) ?? draft[0]
   const [error, setError] = useState('')
   const valid = draft.every(validMarkPreset)
   useEffect(() => { dialog.current?.showModal() }, [])
@@ -25,13 +28,27 @@ export function MarkPresetDialog({ presets, onSave, onClose }: {
       if (!valid) return
       const cleaned = draft.map((preset) => ({ ...preset, label: preset.label.trim() }))
       try {
-        writeMarkPresets(cleaned)
-        onSave(cleaned)
+        const preferences = { ...note, presetId: defaultPreset.id }
+        writeReadingPreferences(cleaned, preferences)
+        onSave(cleaned, preferences)
       } catch {
         setError('保存失败，请检查浏览器的存储权限。')
       }
     }}>
-      <h2 id="mark-preset-title">标记偏好</h2>
+      <h2 id="mark-preset-title">标记与批注偏好</h2>
+      <fieldset className="note-preferences">
+        <legend>新建批注</legend>
+        <label>默认批注类型
+          <select value={note.kind} onChange={(event) => setNote({ ...note, kind: event.target.value as NoteKind })}>
+            {noteKinds.map((kind) => <option key={kind}>{kind}</option>)}
+          </select>
+        </label>
+        <label>默认原文标记
+          <select value={defaultPreset.id} onChange={(event) => setNote({ ...note, presetId: event.target.value })}>
+            {draft.map((preset, index) => <option key={preset.id} value={preset.id}>{preset.label || `样式 ${index + 1}`}</option>)}
+          </select>
+        </label>
+      </fieldset>
       <p className="mark-preset-intro">为常用标记定义含义，最多 5 个字。设置会用于以后的练习。</p>
       <div className="mark-preset-rows">
         {draft.map((preset, index) => (

@@ -35,9 +35,36 @@ export function validMarkPreset(value: unknown): value is MarkPreset {
     && typeof preset.style === 'string' && Object.prototype.hasOwnProperty.call(markStyles, preset.style)
 }
 
+export const noteKinds = ['提炼', '改写', '随记'] as const
+export type NoteKind = typeof noteKinds[number]
+
+export interface NotePreferences {
+  kind: NoteKind
+  presetId: string
+}
+
+const preferencesKey = 'shenlun-reading-preferences-v1'
 const storageKey = 'shenlun-mark-presets-v2'
 
-export function readMarkPresets(): MarkPreset[] {
+export function readReadingPreferences(): { presets: MarkPreset[]; note: NotePreferences } {
+  const legacy = readMarkPresets()
+  try {
+    const saved = JSON.parse(localStorage.getItem(preferencesKey) ?? 'null')
+    const presets = Array.isArray(saved?.presets) && saved.presets.length && saved.presets.every(validMarkPreset)
+      ? saved.presets as MarkPreset[] : legacy
+    return {
+      presets,
+      note: {
+        kind: noteKinds.includes(saved?.note?.kind) ? saved.note.kind : '提炼',
+        presetId: presets.find((preset) => preset.id === saved?.note?.presetId)?.id ?? presets[0].id,
+      },
+    }
+  } catch {
+    return { presets: legacy, note: { kind: '提炼', presetId: legacy[0].id } }
+  }
+}
+
+function readMarkPresets(): MarkPreset[] {
   try {
     const current = localStorage.getItem(storageKey)
     const saved = current ?? localStorage.getItem('shenlun-mark-presets-v1')
@@ -51,8 +78,8 @@ export function readMarkPresets(): MarkPreset[] {
   return defaultMarkPresets
 }
 
-export function writeMarkPresets(presets: MarkPreset[]) {
-  localStorage.setItem(storageKey, JSON.stringify(presets))
+export function writeReadingPreferences(presets: MarkPreset[], note: NotePreferences) {
+  localStorage.setItem(preferencesKey, JSON.stringify({ presets, note }))
 }
 
 export function syncMarkPresets(marks: ReadingMark[], presets: MarkPreset[]): ReadingMark[] {
