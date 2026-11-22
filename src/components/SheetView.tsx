@@ -208,6 +208,7 @@ export const RowView = memo(
 // ---------------------------------------------------------------------------
 
 interface PanelViewProps {
+  review?: ReactNode
   panel: Panel
   tokensById: TokenMap
   compoundRules: Record<string, CompoundRule>
@@ -224,6 +225,7 @@ interface PanelViewProps {
 
 function PanelViewInner({
   panel,
+  review,
   tokensById,
   compoundRules,
   selStart,
@@ -280,6 +282,7 @@ function PanelViewInner({
           )
         })}
       </div>
+      {review}
     </div>
   )
 }
@@ -406,12 +409,13 @@ function PageViewInner({
 
         {/* 中间那条竖向虚线只在左右两栏版式下才有意义；A4 单栏时画上去会横穿答题区 */}
         <div className={`sheet-body${split ? '' : ' sheet-body--single'}`}>
-          {page.panels.map((panel) => {
+          {page.panels.map((panel, index) => {
             const isActive = interactive && panel.blockId === activeBlockId
             return (
               <PanelView
                 key={panel.index}
                 panel={panel}
+                review={index === page.panels.length - 1 ? review : undefined}
                 tokensById={tokensByBlockId.get(panel.blockId) ?? emptyTokens}
                 compoundRules={compoundRules}
                 selStart={isActive ? selStart : 0}
@@ -426,8 +430,6 @@ function PageViewInner({
             )
           })}
         </div>
-
-        {review}
 
         <div className="sheet-footer">
           <span className="end-note">{isLast ? '全卷到此结束' : ''}</span>

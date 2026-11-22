@@ -260,9 +260,9 @@ export default function App() {
   )
 
   const lastPage = doc.pages[doc.pages.length - 1]
-  const lastPageRows = Math.max(0, ...(lastPage?.panels.map((panel) => panel.rows.length) ?? []))
-  const reviewFitsOnLastPage = Boolean(lastPage
-    && geometry.panelHeight(lastPage.index) - geometry.panelHeading - lastPageRows * geometry.cell >= 32)
+  const lastPanel = lastPage?.panels[lastPage.panels.length - 1]
+  const reviewFitsOnLastPage = Boolean(lastPage && lastPanel
+    && geometry.panelHeight(lastPage.index) - geometry.panelHeading - lastPanel.rows.length * geometry.cell >= 32)
 
   const tokensByBlockId = useMemo(
     () => new Map(doc.blocks.map((b) => [b.blockId, new Map(b.tokens.map((t) => [t.id, t]))])),
