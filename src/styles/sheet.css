@@ -530,6 +530,15 @@
   background: #f7f9fc;
 }
 
+.sheet-page--review-only {
+  width: 210mm;
+  padding: 6.4mm;
+}
+
+.answer-card-review {
+  width: min(100%, var(--panel-w));
+}
+
 .sheet-page--review-only .answer-card-review {
   margin-top: 0;
 }
@@ -554,3 +563,29 @@
   resize: none;
   user-select: text;
 }
+
+.answer-review-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2mm;
+}
+
+.answer-review-preview {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  padding: 2mm 3mm;
+  border: 0.25mm solid #cdd5e5;
+  border-radius: 1mm;
+  background: var(--paper);
+  font-size: 3.5mm;
+  line-height: 1.65;
+  user-select: text;
+}
+
+.answer-review-preview > :first-child { margin-top: 0; }
+.answer-review-preview table { border-collapse: collapse; }
+.answer-review-preview :is(th, td) { border: 1px solid var(--line); padding: 1mm 2mm; }
+.answer-review-preview pre { overflow: auto; background: #f1f4f8; padding: 2mm; }

@@ -110,20 +110,22 @@ export interface SheetGeometry {
 export interface GeometryOptions {
   columns?: number
   layout?: SheetLayout
+  compactHeaderHeight?: number
 }
 
 export function computeGeometry(options: GeometryOptions = {}): SheetGeometry {
   const layout = options.layout ?? 'a3-split'
   const spec = SHEET_SPECS[layout]
+  const headerFirst = options.compactHeaderHeight ?? spec.headerFirst
   const columns = Math.max(1, Math.floor(options.columns ?? 20))
 
   const contentWidth = spec.pageWidth - PAGE_BORDER_MM * 2 - spec.padding * 2
   const panelWidth = (contentWidth - spec.panelGap * (spec.panelsPerPage - 1)) / spec.panelsPerPage
   const cell = panelWidth / columns
 
-  // 注意：首页与续页的可用高度完全相同 —— 这样每一页都正好放 24 行（600 格）
+  // 首页与续页使用同一个页头空间预算。
   const panelHeight = (_pageIndex: number) =>
-    spec.pageHeight - PAGE_BORDER_MM * 2 - spec.padding * 2 - spec.headerFirst - spec.footer - BODY_PADDING_TOP_MM
+    spec.pageHeight - PAGE_BORDER_MM * 2 - spec.padding * 2 - headerFirst - spec.footer - BODY_PADDING_TOP_MM
 
   const rowsForPage = (pageIndex: number) => {
     const usable = panelHeight(pageIndex) - spec.panelHeading
@@ -135,7 +137,7 @@ export function computeGeometry(options: GeometryOptions = {}): SheetGeometry {
     pageWidth: spec.pageWidth,
     pageHeight: spec.pageHeight,
     padding: spec.padding,
-    headerFirst: spec.headerFirst,
+    headerFirst,
     footer: spec.footer,
     panelGap: spec.panelGap,
     panelHeading: spec.panelHeading,
@@ -165,9 +167,10 @@ export function chooseLayout(
   columns: number,
   capacityRows: number,
   mode: 'single' | 'full',
+  compactHeaderHeight?: number,
 ): SheetLayout {
   if (mode === 'full') return 'a3-split'
-  const single = computeGeometry({ columns, layout: 'a4-single' })
+  const single = computeGeometry({ columns, layout: 'a4-single', compactHeaderHeight })
   return capacityRows <= single.rowsForPage(0) ? 'a4-single' : 'a3-split'
 }
 

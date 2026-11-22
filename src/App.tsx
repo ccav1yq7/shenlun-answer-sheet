@@ -1,3 +1,4 @@
+import { ReviewNotes } from './components/ReviewNotes'
 import { orderReadingMarks, questionReadingSources } from './document/readingOrder'
 import { hasFenbiAssistant, requestFenbiAssistant } from './document/fenbiAssistant'
 /**
@@ -219,17 +220,20 @@ export default function App() {
 
   // 只依赖「容量」这个数字，不依赖整个 blocks 数组 ——
   // 否则每敲一个字都会新建 blocks 数组、连带重算几何。
-  const activeCapacity = useMemo(() => {
-    const active = sheet.blocks.find((b) => b.id === activeBlockId) ?? sheet.blocks[0]
-    return active ? active.capacity : 0
-  }, [sheet.blocks, activeBlockId])
+  const activeBlock = sheet.blocks.find((b) => b.id === activeBlockId) ?? sheet.blocks[0]
+  const activeCapacity = activeBlock.capacity
+  const display = activeBlock.card?.display
+  // 页头按可见项预留空间，名称允许换行。
+  const compactHeaderHeight = display && !display.instructions
+    ? 8 + (display.title ? 27 : 0) + (display.identity ? 9 : 0) + (display.name ? 17 : 0)
+    : undefined
 
   // 单题练习时，题目装得进一页 A4 就用 A4 纵向（纸张缩小、格子不变）；装不下才用 A3 左右两栏
   const geometry = useMemo(() => {
     const capacityRows = activeCapacity > 0 ? Math.ceil(activeCapacity / sheet.columns) : 0
-    const layout = chooseLayout(sheet.columns, capacityRows, sheet.mode)
-    return computeGeometry({ columns: sheet.columns, layout })
-  }, [sheet.columns, sheet.mode, activeCapacity])
+    const layout = chooseLayout(sheet.columns, capacityRows, sheet.mode, compactHeaderHeight)
+    return computeGeometry({ columns: sheet.columns, layout, compactHeaderHeight })
+  }, [sheet.columns, sheet.mode, activeCapacity, compactHeaderHeight])
 
   const isSplit = geometry.panelsPerPage > 1
   const paperLabel = geometry.layout === 'a4-single' ? 'A4 纵向' : 'A3 横向'
@@ -265,7 +269,6 @@ export default function App() {
     [doc],
   )
 
-  const activeBlock = sheet.blocks.find((b) => b.id === activeBlockId) ?? sheet.blocks[0]
   const activeLayout = doc.blocks.find((b) => b.blockId === activeBlock.id) ?? doc.blocks[0]
 
   const caret = useMemo(
@@ -1352,12 +1355,8 @@ export default function App() {
                 caretFraction={caret.fraction}
                 reviewFitsOnLastPage={reviewFitsOnLastPage}
                 review={currentCard.display.review && (
-                  <section className="answer-card-review" aria-labelledby="answer-review-title">
-                    <label id="answer-review-title" htmlFor="answer-review">复盘笔记</label>
-                    <textarea id="answer-review" value={currentCard.review}
-                      placeholder="记下这次漏掉的要点、表达问题，或下次要改进的地方"
-                      onChange={(event) => updateBlock(activeBlock.id, { card: { ...currentCard, review: event.target.value } })} />
-                  </section>
+                  <ReviewNotes key={`${activeBlock.id}-${currentCard.id}`} value={currentCard.review}
+                    onChange={(review) => updateBlock(activeBlock.id, { card: { ...currentCard, review } })} />
                 )}
                 card={activeBlock.card}
                 onIdentityChange={(field, value) => updateBlock(activeBlock.id, { card: { ...currentCard, [field]: value } })}
