@@ -52,11 +52,45 @@ function Tabs({ label, items, value, onChange, panel }: {
   </div>
 }
 
+const readingDisplayKey = 'shenlun-reading-display-v1'
+const readingOptions = {
+  fontSize: [14, 16, 18, 20, 22, 24],
+  lineHeight: [1.4, 1.6, 1.75, 2, 2.2],
+  paragraphGap: [0, 4, 8, 12, 16, 24],
+}
+const promptColors = {
+  '#f6f8fb': '浅蓝灰',
+  '#ffffff': '白色',
+  '#f9f3e7': '米色',
+  '#edf5ef': '浅绿',
+  '#f3eff9': '浅紫',
+}
+const readingDefaults = { fontSize: 16, lineHeight: 1.75, paragraphGap: 8, promptColor: '#f6f8fb', paragraphNumbers: false }
+
+function readDisplaySettings() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(readingDisplayKey) ?? '{}') ?? {}
+    return {
+      fontSize: readingOptions.fontSize.includes(saved.fontSize) ? Number(saved.fontSize) : readingDefaults.fontSize,
+      lineHeight: readingOptions.lineHeight.includes(saved.lineHeight) ? Number(saved.lineHeight) : readingDefaults.lineHeight,
+      paragraphGap: readingOptions.paragraphGap.includes(saved.paragraphGap) ? Number(saved.paragraphGap) : readingDefaults.paragraphGap,
+      promptColor: Object.prototype.hasOwnProperty.call(promptColors, saved.promptColor) ? String(saved.promptColor) : readingDefaults.promptColor,
+      paragraphNumbers: typeof saved.paragraphNumbers === 'boolean'
+        ? saved.paragraphNumbers : localStorage.getItem('shenlun-paragraph-numbers') === '1',
+    }
+  } catch {
+    return readingDefaults
+  }
+}
+
 export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPercent, onWidthChange, marks, markSets, activeMarkSet, onMarkSetChange, onSaveMarkSet, presets, notePreferences, onSaveMark, onRemoveMark }: QuestionPaneProps) {
   const [markSetEdit, setMarkSetEdit] = useState<{ create: boolean; name: string } | null>(null)
-  const [showParagraphNumbers, setShowParagraphNumbers] = useState(() => {
-    try { return localStorage.getItem('shenlun-paragraph-numbers') === '1' } catch { return false }
-  })
+  const [display, setDisplay] = useState(readDisplaySettings)
+  function updateDisplay(patch: Partial<typeof readingDefaults>) {
+    const next = { ...display, ...patch }
+    setDisplay(next)
+    try { localStorage.setItem(readingDisplayKey, JSON.stringify(next)) } catch { /* Session only. */ }
+  }
   const sections = useMemo(() => materialSections(question.materials), [question.materials])
   const questions = question.paper?.questions ?? []
   const questionIndex = question.questionIndex ?? 0
@@ -94,7 +128,13 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
 
   return <>
     <aside ref={pane} className="question-pane" aria-label="题目与材料" tabIndex={0}
-      style={{ '--question-width': `calc(${widthPercent}% + ${zoomOffset}px)` } as CSSProperties}>
+      style={{
+        '--question-width': `calc(${widthPercent}% + ${zoomOffset}px)`,
+        '--reading-font-size': `${display.fontSize}px`,
+        '--reading-line-height': display.lineHeight,
+        '--reading-paragraph-gap': `${display.paragraphGap}px`,
+        '--reading-prompt-color': display.promptColor,
+      } as CSSProperties}>
       <div className="question-pane-tabs">
         {questions.length > 1 && <Tabs label="切换题目" items={questions.map((item) => item.label)}
           value={questionIndex} onChange={onQuestionChange} panel="question-prompt-panel" />}
@@ -136,11 +176,33 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
       </form>}
       <div className="reading-options">
         <p className="reading-hint">选中文字可标记或写笔记</p>
-        <label><input type="checkbox" checked={showParagraphNumbers} onChange={(event) => {
-          const checked = event.target.checked
-          setShowParagraphNumbers(checked)
-          try { localStorage.setItem('shenlun-paragraph-numbers', checked ? '1' : '0') } catch { /* Session only. */ }
-        }} />段落编号</label>
+        <details className="reading-display-settings">
+          <summary className="btn">显示设置</summary>
+          <div className="reading-display-fields">
+            <label>字号
+              <select value={display.fontSize} onChange={(event) => updateDisplay({ fontSize: Number(event.target.value) })}>
+                {readingOptions.fontSize.map((size) => <option key={size} value={size}>{size} px</option>)}
+              </select>
+            </label>
+            <label>段内行距
+              <select value={display.lineHeight} onChange={(event) => updateDisplay({ lineHeight: Number(event.target.value) })}>
+                {readingOptions.lineHeight.map((height) => <option key={height} value={height}>{height} 倍</option>)}
+              </select>
+            </label>
+            <label>段间距
+              <select value={display.paragraphGap} onChange={(event) => updateDisplay({ paragraphGap: Number(event.target.value) })}>
+                {readingOptions.paragraphGap.map((gap) => <option key={gap} value={gap}>{gap} px</option>)}
+              </select>
+            </label>
+            <label>题干底色
+              <select value={display.promptColor} onChange={(event) => updateDisplay({ promptColor: event.target.value })}>
+                {Object.entries(promptColors).map(([color, name]) => <option key={color} value={color}>{name}</option>)}
+              </select>
+            </label>
+            <label><input type="checkbox" checked={display.paragraphNumbers}
+              onChange={(event) => updateDisplay({ paragraphNumbers: event.target.checked })} />材料段落编号</label>
+          </div>
+        </details>
       </div>
       <div className="question-prompt-content" id="question-prompt-panel"
         role={questions.length > 1 ? 'tabpanel' : undefined}
@@ -153,7 +215,7 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
           role={sections.length > 0 ? 'tabpanel' : undefined}
           aria-labelledby={sections.length > 0 ? `question-material-panel-tab-${materialIndex}` : undefined}
           tabIndex={0}>
-          <AnnotatedText key={activeMarkSet.id} indentParagraphs showParagraphNumbers={showParagraphNumbers} text={sections[materialIndex]?.text ?? question.materials}
+          <AnnotatedText key={activeMarkSet.id} indentParagraphs showParagraphNumbers={display.paragraphNumbers} text={sections[materialIndex]?.text ?? question.materials}
             source={`material-${sections[materialIndex]?.label ?? 'all'}`}
             heading={sections[materialIndex]?.label ?? '材料'}
             label={sections[materialIndex]?.label ?? '材料'} marks={marks} noteNumbers={noteNumbers} presets={presets} notePreferences={notePreferences} onSave={onSaveMark} onRemove={onRemoveMark} />

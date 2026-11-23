@@ -497,8 +497,8 @@ select:focus-visible,
   overflow: hidden;
   padding: 22px clamp(16px, 2vw, 32px);
   background: var(--panel);
-  font-size: 16px;
-  line-height: 1.75;
+  font-size: var(--reading-font-size, 16px);
+  line-height: var(--reading-line-height, 1.75);
 }
 
 .question-pane h2 {
@@ -613,7 +613,7 @@ select:focus-visible,
   padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #f6f8fb;
+  background: var(--reading-prompt-color, #f6f8fb);
 }
 
 .question-prompt-content .reading-passage {
@@ -1280,3 +1280,37 @@ select:focus-visible,
 .answer-workspace--reader-only .question-divider,
 .sheet-viewport[hidden],
 .zoom-bar[hidden] { display: none; }
+
+.reading-display-settings {
+  position: relative;
+}
+
+.reading-display-settings summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.reading-display-fields {
+  position: absolute;
+  inset-inline-end: 0;
+  top: calc(100% + 6px);
+  z-index: 5;
+  display: grid;
+  gap: 8px;
+  width: max-content;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 6px 18px #10182824;
+}
+
+.reading-display-fields label { justify-content: space-between; }
+.reading-display-fields select { font: inherit; color: inherit; }
+
+.reading-paragraph-break {
+  display: block;
+  height: var(--reading-paragraph-gap, 8px);
+  font-size: 0;
+  line-height: 0;
+}

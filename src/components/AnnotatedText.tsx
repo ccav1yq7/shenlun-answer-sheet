@@ -112,14 +112,17 @@ export function AnnotatedText({ text, source, label, heading, indentParagraphs =
 
   let paragraphStart = true
   let indentIndex = 0
+  let breakIndex = 0
   function renderedText(value: string): ReactNode {
-    if (!indentParagraphs || !value) return value
+    if (!value) return value
     const segments: ReactNode[] = []
     for (const text of value.split(/(\n)/)) {
       if (!text) continue
       if (text === '\n') {
         paragraphStart = true
-      } else if (paragraphStart && text.trim()) {
+        segments.push(<span className="reading-paragraph-break" key={`break-${breakIndex++}`}>{text}</span>)
+        continue
+      } else if (indentParagraphs && paragraphStart && text.trim()) {
         indentIndex++
         segments.push(<span className="reading-paragraph-indent" aria-hidden="true"
           data-paragraph={showParagraphNumbers ? `P${indentIndex}` : undefined} key={indentIndex} />)
