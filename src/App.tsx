@@ -137,6 +137,8 @@ export default function App() {
   const questionRef = useRef(question)
   questionRef.current = question
   const [showQuestion, setShowQuestion] = useState(true)
+  const [cardCollapsed, setCardCollapsed] = useState(false)
+  const readerOnly = Boolean(question && showQuestion && cardCollapsed)
   const [importingQuestion, setImportingQuestion] = useState(false)
   const [selection, setSelection] = useState({ start: 0, end: 0 })
   const [zoomMode, setZoomMode] = useState<'fit' | number>(defaults.zoom ?? 'fit')
@@ -301,6 +303,7 @@ export default function App() {
     if (!el) return
     const pageWidthPx = geometry.pageWidth * PAGE_PX_PER_MM
     const measure = () => {
+      if (!el.clientWidth) return
       const available = el.clientWidth - 44
       setAutoScale(Math.max(0.2, Math.min(1, available / pageWidthPx)))
     }
@@ -1035,9 +1038,22 @@ export default function App() {
             </button>
             {question && (
               <button type="button" className="btn" aria-expanded={showQuestion}
-                onClick={() => setShowQuestion((visible) => !visible)}>
+                onClick={() => {
+                  if (showQuestion) setCardCollapsed(false)
+                  setShowQuestion(!showQuestion)
+                }}>
                 {showQuestion ? '收起题目' : '展开题目'}
               </button>
+            )}
+            {question && (
+              <button type="button" className="btn" aria-expanded={!readerOnly}
+                aria-controls="answer-card-viewport" onClick={() => {
+                  if (!readerOnly) {
+                    editorRef.current?.getElement()?.blur()
+                    setShowQuestion(true)
+                  }
+                  setCardCollapsed(!readerOnly)
+                }}>{readerOnly ? '展开答题卡' : '收起答题卡'}</button>
             )}
             <span className="toolbar-sep" />
             <button type="button" className="btn" onClick={() => void showPracticeDialog('save')}>保存练习</button>
@@ -1324,7 +1340,7 @@ export default function App() {
           </div>
         </div>
 
-        <div className="answer-workspace">
+        <div className={`answer-workspace${readerOnly ? ' answer-workspace--reader-only' : ''}`}>
           {question && showQuestion && (
             <QuestionPane question={question} onQuestionChange={selectImportedQuestion}
               zoomOffset={zoomOffset} widthPercent={readerWidth} onWidthChange={setReaderWidth}
@@ -1335,7 +1351,7 @@ export default function App() {
                 : [...current, mark])}
               onRemoveMark={(id) => updateReadingMarks((current) => current.filter((mark) => mark.id !== id))} />
           )}
-          <div className="sheet-viewport" ref={viewportRef}>
+          <div id="answer-card-viewport" className="sheet-viewport" ref={viewportRef} hidden={readerOnly}>
             <div className="sheet-scaler" ref={exportSourceRef} style={{ zoom: scale } as React.CSSProperties}>
               <SheetView
                 doc={doc}
@@ -1394,7 +1410,7 @@ export default function App() {
           </div>
         </details>}
 
-        <div className="zoom-bar">
+        <div className="zoom-bar" hidden={readerOnly}>
           <button type="button" onClick={() => changeZoom(-0.1)} title="缩小">
             −
           </button>
@@ -1421,7 +1437,7 @@ export default function App() {
               activeBlock.card && currentCard.display.name ? currentCard.name : '',
             ],
           ])}
-          enabled
+          enabled={!readerOnly}
           onCommit={(text, caretOffset) => handleCommit(activeBlock.id, text, caretOffset)}
           onSelectionChange={(start, end) => setSelection({ start, end })}
           onUndo={handleUndo}

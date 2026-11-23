@@ -1275,3 +1275,8 @@ select:focus-visible,
   font: 650 0.7em / 1.1 var(--font-ui);
   font-variant-numeric: tabular-nums;
 }
+
+.answer-workspace--reader-only .question-pane { flex: 1 1 auto; }
+.answer-workspace--reader-only .question-divider,
+.sheet-viewport[hidden],
+.zoom-bar[hidden] { display: none; }

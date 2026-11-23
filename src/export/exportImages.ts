@@ -13,7 +13,8 @@ async function* captureGridPages(source: HTMLElement) {
   const staging = document.createElement('div')
   staging.setAttribute('aria-hidden', 'true')
   staging.style.cssText = 'position:fixed;left:-100000px;top:0;pointer-events:none;'
-  source.parentElement?.append(staging)
+  const host = source.closest('.app') ?? source.parentElement
+  host?.append(staging)
   try {
     const pages = Array.from(source.querySelectorAll<HTMLElement>('.sheet-page:not(.sheet-page--review-only)'), (page) => {
       const clone = page.cloneNode(true) as HTMLElement
