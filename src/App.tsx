@@ -1122,10 +1122,22 @@ export default function App() {
                 min={1}
                 max={20000}
                 placeholder="自定义"
-                value={CAPACITY_PRESETS.includes(activeBlock.capacity) ? '' : activeBlock.capacity}
-                onChange={(e) => {
-                  const value = Number(e.target.value)
-                  if (Number.isFinite(value) && value > 0) handleCapacity(value)
+                key={`${activeBlock.id}:${activeBlock.capacity}`}
+                defaultValue={CAPACITY_PRESETS.includes(activeBlock.capacity) ? '' : activeBlock.capacity}
+                onBlur={(event) => {
+                  const input = event.currentTarget
+                  const value = input.valueAsNumber
+                  if (Number.isFinite(value) && value > 0 && Math.floor(value) !== activeBlock.capacity) {
+                    handleCapacity(value)
+                  } else {
+                    input.value = input.defaultValue
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                    event.preventDefault()
+                    event.currentTarget.blur()
+                  }
                 }}
               />
             </div>

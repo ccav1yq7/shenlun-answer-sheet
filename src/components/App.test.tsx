@@ -454,7 +454,12 @@ describe('自定义字数', () => {
   it('数字输入框可以填任意字数', () => {
     const { container } = setup()
     const input = container.querySelector('input[type="number"]') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '300' } })
+    expect(input.value).toBe('300')
+    fireEvent.change(input, { target: { value: '3000' } })
+    expect(input.value).toBe('3000')
     fireEvent.change(input, { target: { value: '250' } })
+    fireEvent.blur(input)
     // 250 格 = 10 行（每行 25 格）
     expect(container.querySelectorAll('.grid-row')).toHaveLength(10)
     const stats = Array.from(container.querySelectorAll('.stat')).map((el) => el.textContent ?? '')
