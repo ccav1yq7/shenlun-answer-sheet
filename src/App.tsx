@@ -193,6 +193,7 @@ export default function App() {
 
   const editorRef = useRef<EditorSurfaceHandle | null>(null)
   const [exportContent, setExportContent] = useState(defaults.exportContent ?? { prompt: true, materials: true, notes: false, answer: true })
+  const [paperSize, setPaperSize] = useState<'auto' | 'a4'>(defaults.paperSize === 'a4' ? 'a4' : 'auto')
   const [keepExportFormat, setKeepExportFormat] = useState(defaults.keepExportFormat ?? true)
   const [exporting, setExporting] = useState(false)
   const [cardDialog, setCardDialog] = useState<'add' | 'edit' | null>(null)
@@ -231,9 +232,9 @@ export default function App() {
   // 单题练习时，题目装得进一页 A4 就用 A4 纵向（纸张缩小、格子不变）；装不下才用 A3 左右两栏
   const geometry = useMemo(() => {
     const capacityRows = activeCapacity > 0 ? Math.ceil(activeCapacity / sheet.columns) : 0
-    const layout = chooseLayout(sheet.columns, capacityRows, sheet.mode, compactHeaderHeight)
+    const layout = paperSize === 'a4' ? 'a4-single' : chooseLayout(sheet.columns, capacityRows, sheet.mode, compactHeaderHeight)
     return computeGeometry({ columns: sheet.columns, layout, compactHeaderHeight })
-  }, [sheet.columns, sheet.mode, activeCapacity, compactHeaderHeight])
+  }, [sheet.columns, sheet.mode, activeCapacity, compactHeaderHeight, paperSize])
 
   const isSplit = geometry.panelsPerPage > 1
   const paperLabel = geometry.layout === 'a4-single' ? 'A4 纵向' : 'A3 横向'
@@ -352,8 +353,9 @@ export default function App() {
       zoomBase: zoomBase.current,
       exportContent,
       keepExportFormat,
+      ...(paperSize === 'a4' ? { paperSize } : {}),
     }
-  }, [sheet.columns, sheet.profileKey, sheet.showTemplate, readerWidth, zoomMode, exportContent, keepExportFormat])
+  }, [sheet.columns, sheet.profileKey, sheet.showTemplate, readerWidth, zoomMode, exportContent, keepExportFormat, paperSize])
 
   const snapshot = useMemo((): PracticeSnapshot => ({
     sheet,
@@ -477,6 +479,7 @@ export default function App() {
     zoomBase.current = saved.preferences.zoomBase
     setExportContent(saved.preferences.exportContent)
     setKeepExportFormat(saved.preferences.keepExportFormat)
+    setPaperSize(saved.preferences.paperSize === 'a4' ? 'a4' : 'auto')
     practiceDirectory.current = record.storage === 'folder' ? directory : undefined
     setAutosaveState('idle')
     setAutosaveError('')
@@ -1276,6 +1279,14 @@ export default function App() {
                     {n}
                   </option>
                 ))}
+              </select>
+            </label>
+            <label className="toolbar-label">
+              纸张
+              <select aria-label="纸张" className="input-num" style={{ width: 'auto', marginLeft: 6 }} value={paperSize}
+                onChange={(event) => setPaperSize(event.target.value === 'a4' ? 'a4' : 'auto')}>
+                <option value="a4">固定 A4</option>
+                <option value="auto">自动扩展为 A3</option>
               </select>
             </label>
             <label className="toolbar-label" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>

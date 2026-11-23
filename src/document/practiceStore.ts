@@ -11,6 +11,7 @@ export interface ExportContent {
 }
 
 export interface PracticePreferences {
+  paperSize?: 'auto' | 'a4'
   capacity: number
   columns: number
   profileKey: AnswerSheet['profileKey']
