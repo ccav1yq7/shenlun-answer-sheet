@@ -1117,22 +1117,29 @@ select:focus-visible,
 .practice-webdav .practice-hint { margin: 0; }
 
 .assistant-settings {
-  position: relative;
+  position: fixed;
+  right: 18px;
+  bottom: 66px;
+  z-index: 21;
 }
 
 .assistant-settings > summary {
   cursor: pointer;
   list-style: none;
+  background: #4940c8;
+  border-color: #4940c8;
+  color: #fff;
+  box-shadow: 0 4px 14px #10182824;
 }
 
 .assistant-settings[open] > summary {
-  background: var(--line);
+  background: #3932a4;
 }
 
 .assistant-settings-panel {
   position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
+  bottom: calc(100% + 8px);
+  right: 0;
   z-index: 12;
   display: grid;
   gap: 6px;
