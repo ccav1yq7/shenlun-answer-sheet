@@ -585,3 +585,16 @@
 .answer-review-preview table { border-collapse: collapse; }
 .answer-review-preview :is(th, td) { border: 1px solid var(--line); padding: 1mm 2mm; }
 .answer-review-preview pre { overflow: auto; background: #f1f4f8; padding: 2mm; }
+
+.sheet-header--with-prompt:not(.sheet-header--compact) {
+  height: calc(var(--header-first) + var(--sheet-prompt-height));
+}
+
+.sheet-header .sheet-question-prompt {
+  flex: 0 0 auto;
+  height: calc(var(--sheet-prompt-height) - 2mm);
+  margin-top: 2mm;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

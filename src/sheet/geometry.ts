@@ -88,6 +88,7 @@ export interface SheetGeometry {
   /** 页面四周留白 */
   padding: number
   headerFirst: number
+  promptHeight: number
   footer: number
   panelGap: number
   panelHeading: number
@@ -107,25 +108,35 @@ export interface SheetGeometry {
   rowsForPage: (pageIndex: number) => number
 }
 
+/** Reserve room for question text in the first-page header, using the narrower A4 width. */
+export function promptHeightFor(text: string): number {
+  if (!text.trim()) return 0
+  const lines = text.split(/\r?\n/).reduce((count, line) =>
+    count + Math.max(1, Math.ceil(Array.from(line).length / 60)), 0)
+  return Math.min(105, 15 + lines * 4.75)
+}
+
 export interface GeometryOptions {
   columns?: number
   layout?: SheetLayout
   compactHeaderHeight?: number
+  promptHeight?: number
 }
 
 export function computeGeometry(options: GeometryOptions = {}): SheetGeometry {
   const layout = options.layout ?? 'a3-split'
   const spec = SHEET_SPECS[layout]
   const headerFirst = options.compactHeaderHeight ?? spec.headerFirst
+  const promptHeight = options.promptHeight ?? 0
   const columns = Math.max(1, Math.floor(options.columns ?? 20))
 
   const contentWidth = spec.pageWidth - PAGE_BORDER_MM * 2 - spec.padding * 2
   const panelWidth = (contentWidth - spec.panelGap * (spec.panelsPerPage - 1)) / spec.panelsPerPage
   const cell = panelWidth / columns
 
-  // 首页与续页使用同一个页头空间预算。
-  const panelHeight = (_pageIndex: number) =>
+  const panelHeight = (pageIndex: number) =>
     spec.pageHeight - PAGE_BORDER_MM * 2 - spec.padding * 2 - headerFirst - spec.footer - BODY_PADDING_TOP_MM
+    - (pageIndex === 0 ? promptHeight : 0)
 
   const rowsForPage = (pageIndex: number) => {
     const usable = panelHeight(pageIndex) - spec.panelHeading
@@ -138,6 +149,7 @@ export function computeGeometry(options: GeometryOptions = {}): SheetGeometry {
     pageHeight: spec.pageHeight,
     padding: spec.padding,
     headerFirst,
+    promptHeight,
     footer: spec.footer,
     panelGap: spec.panelGap,
     panelHeading: spec.panelHeading,
@@ -168,9 +180,10 @@ export function chooseLayout(
   capacityRows: number,
   mode: 'single' | 'full',
   compactHeaderHeight?: number,
+  promptHeight = 0,
 ): SheetLayout {
   if (mode === 'full') return 'a3-split'
-  const single = computeGeometry({ columns, layout: 'a4-single', compactHeaderHeight })
+  const single = computeGeometry({ columns, layout: 'a4-single', compactHeaderHeight, promptHeight })
   return capacityRows <= single.rowsForPage(0) ? 'a4-single' : 'a3-split'
 }
 
@@ -181,6 +194,7 @@ export function geometryToCssVars(geo: SheetGeometry): Record<string, string> {
     '--page-h': `${geo.pageHeight}mm`,
     '--page-padding': `${geo.padding}mm`,
     '--header-first': `${geo.headerFirst}mm`,
+    '--sheet-prompt-height': `${geo.promptHeight}mm`,
     '--footer-h': `${geo.footer}mm`,
     '--panel-gap': `${geo.panelGap}mm`,
     '--panel-heading': `${geo.panelHeading}mm`,

@@ -56,7 +56,7 @@ import {
   withProfile,
 } from './layout'
 import type { LayoutProfile } from './layout'
-import { chooseLayout, computeGeometry, geometryToCssVars } from './sheet/geometry'
+import { chooseLayout, computeGeometry, geometryToCssVars, promptHeightFor } from './sheet/geometry'
 import './styles/app.css'
 import './styles/sheet.css'
 import './styles/print.css'
@@ -259,12 +259,16 @@ export default function App() {
     ? 8 + (display.title ? 27 : 0) + (display.identity ? 9 : 0) + (display.name ? 17 : 0)
     : undefined
 
+  const questionPrompt = question?.paper?.questions[question.questionIndex ?? 0]?.prompt ?? question?.prompt ?? ''
+  const cardPrompt = display?.prompt ? questionPrompt : ''
+  const promptHeight = useMemo(() => promptHeightFor(cardPrompt), [cardPrompt])
+
   // 单题练习时，题目装得进一页 A4 就用 A4 纵向（纸张缩小、格子不变）；装不下才用 A3 左右两栏
   const geometry = useMemo(() => {
     const capacityRows = activeCapacity > 0 ? Math.ceil(activeCapacity / sheet.columns) : 0
-    const layout = paperSize === 'a4' ? 'a4-single' : chooseLayout(sheet.columns, capacityRows, sheet.mode, compactHeaderHeight)
-    return computeGeometry({ columns: sheet.columns, layout, compactHeaderHeight })
-  }, [sheet.columns, sheet.mode, activeCapacity, compactHeaderHeight, paperSize])
+    const layout = paperSize === 'a4' ? 'a4-single' : chooseLayout(sheet.columns, capacityRows, sheet.mode, compactHeaderHeight, promptHeight)
+    return computeGeometry({ columns: sheet.columns, layout, compactHeaderHeight, promptHeight })
+  }, [sheet.columns, sheet.mode, activeCapacity, compactHeaderHeight, promptHeight, paperSize])
 
   const isSplit = geometry.panelsPerPage > 1
   const paperLabel = geometry.layout === 'a4-single' ? 'A4 纵向' : 'A3 横向'
@@ -360,6 +364,10 @@ export default function App() {
     const restored = questionAnswers.current.get(index)
     const fresh = createSheet('single', capacity)
     fresh.blocks[0].title = selected.label
+    if (sheet.blocks.find((block) => block.id === activeBlockId)?.card?.display.prompt) {
+      const card = activeAnswerCard(fresh.blocks[0])
+      fresh.blocks[0].card = { ...card, display: { ...card.display, prompt: true } }
+    }
     const next = restored?.sheet ?? { ...fresh, columns: sheet.columns, profileKey: sheet.profileKey, showTemplate: sheet.showTemplate }
     const blockId = restored?.activeBlockId ?? next.blocks[0].id
     const block = next.blocks.find((item) => item.id === blockId) ?? next.blocks[0]
@@ -976,7 +984,7 @@ export default function App() {
         const grid = options.style !== 'text' && blocks.length > 0
         const textBlocks = grid ? front : [...front, ...blocks]
         await exportGridPdf(
-          grid ? pdfGridSources(host, blocks, sheet, profile, paperSize === 'a4', options.style === 'plain-grid') : undefined,
+          grid ? pdfGridSources(host, blocks, sheet, profile, paperSize === 'a4', options.style === 'plain-grid', questionPrompt) : undefined,
           textBlocks.length ? { ...sheet, blocks: textBlocks } : undefined,
           question && selectedSets.length ? pdfReadingPages(host, question, options, selectedSets) : undefined,
         )
@@ -1013,7 +1021,7 @@ export default function App() {
       if (format === 'Word') {
         if (withGrid) {
           const { exportGridDocx } = await import('./export/exportGridDocx')
-          await exportGridDocx(doc, geometry, frontMatter, activeBlock.card)
+          await exportGridDocx(doc, geometry, frontMatter, activeBlock.card, cardPrompt)
         } else {
           const { exportDocx } = await import('./export/exportDocx')
           await exportDocx(exportSheet, { keepIndent: false, title })
@@ -1453,6 +1461,7 @@ export default function App() {
                     onChange={(review) => updateBlock(activeBlock.id, { card: { ...currentCard, review } })} />
                 )}
                 card={activeBlock.card}
+                prompt={cardPrompt}
                 onIdentityChange={(field, value) => updateBlock(activeBlock.id, { card: { ...currentCard, [field]: value } })}
                 showTemplate={sheet.showTemplate}
                 split={isSplit}
@@ -1514,7 +1523,7 @@ export default function App() {
           blockId={activeBlock.id}
           anchor={{ row: caret.rowIndex, column: caret.column, fraction: caret.fraction }}
           caretOffset={selection.start}
-          layoutKey={JSON.stringify([geometry.layout, geometry.cell,
+          layoutKey={JSON.stringify([geometry.layout, geometry.cell, promptHeight,
             currentCard.display.instructions ? 'standard' : [
               currentCard.display.title, currentCard.display.identity,
               activeBlock.card && currentCard.display.name ? currentCard.name : '',

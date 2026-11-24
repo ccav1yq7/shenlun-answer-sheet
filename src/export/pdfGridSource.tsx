@@ -4,7 +4,7 @@ import { SheetView } from '../components/SheetView'
 import type { AnswerBlock, AnswerSheet } from '../document/model'
 import type { LayoutProfile } from '../layout'
 import { layoutDocument } from '../layout'
-import { chooseLayout, computeGeometry, geometryToCssVars } from '../sheet/geometry'
+import { chooseLayout, computeGeometry, geometryToCssVars, promptHeightFor } from '../sheet/geometry'
 import type { GridPdfSource } from './exportImages'
 
 export async function* pdfGridSources(
@@ -14,6 +14,7 @@ export async function* pdfGridSources(
   profile: LayoutProfile,
   forceA4: boolean,
   plain: boolean,
+  questionPrompt: string,
 ): AsyncGenerator<GridPdfSource> {
   const source = document.createElement('div')
   source.setAttribute('aria-hidden', 'true')
@@ -30,9 +31,11 @@ export async function* pdfGridSources(
       const header = plain ? 0 : display && !display.instructions
         ? 8 + (display.title ? 27 : 0) + (display.identity ? 9 : 0) + (display.name ? 17 : 0)
         : undefined
+      const prompt = !plain && block.card?.display.prompt ? questionPrompt : ''
+      const promptHeight = promptHeightFor(prompt)
       const rows = Math.ceil(block.capacity / sheet.columns)
-      const layout = forceA4 ? 'a4-single' : chooseLayout(sheet.columns, rows, sheet.mode, header)
-      const geometry = computeGeometry({ columns: sheet.columns, layout, compactHeaderHeight: header })
+      const layout = forceA4 ? 'a4-single' : chooseLayout(sheet.columns, rows, sheet.mode, header, promptHeight)
+      const geometry = computeGeometry({ columns: sheet.columns, layout, compactHeaderHeight: header, promptHeight })
       const doc = layoutDocument([{
         blockId: block.id, blockTitle: block.title, text: block.text,
         capacity: block.capacity, paragraphs: block.paragraphStyles,
@@ -42,7 +45,7 @@ export async function* pdfGridSources(
           <SheetView doc={doc} columns={sheet.columns} activeBlockId={block.id}
             tokensByBlockId={new Map(doc.blocks.map((b) => [b.blockId, new Map(b.tokens.map((t) => [t.id, t]))]))}
             compoundRules={profile.compoundRules} selStart={0} selEnd={0} caretRow={-1} caretColumn={-1} caretFraction={0}
-            card={card} showTemplate={sheet.showTemplate && !plain} split={geometry.panelsPerPage > 1}
+            card={card} prompt={prompt} showTemplate={sheet.showTemplate && !plain} split={geometry.panelsPerPage > 1}
             paperLabel={layout === 'a4-single' ? 'A4 纵向' : 'A3 横向'}
             interactive={false} onPointerDown={() => undefined} />
         </div>,

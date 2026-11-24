@@ -38,7 +38,7 @@ export interface AnswerCardDetails {
   candidateName?: string
   admissionNumber?: string
   review: string
-  display: typeof defaultCardDisplay
+  display: typeof defaultCardDisplay & { prompt?: boolean }
 }
 
 export interface ArchivedAnswerCard extends AnswerCardDetails {

@@ -768,3 +768,31 @@ it('导入粉笔五题套卷后可切题，并保留每题的答案和容量', (
   expect(textarea).toHaveValue('第五题的答案')
   expect(screen.getByText('500', { selector: 'b' })).toBeInTheDocument()
 })
+
+it('答题卡题干随题目切换，左侧题干可独立隐藏', () => {
+  Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
+    configurable: true, value(this: HTMLDialogElement) { this.open = true },
+  })
+  const paper = {
+    title: '练习',
+    questions: [{ label: '第 1 题', prompt: '第一题要求' }, { label: '第 2 题', prompt: '第二题要求' }],
+    sections: [{ label: '材料 1', text: '材料正文' }],
+  }
+  const hash = new URLSearchParams({ 'fenbi-question': JSON.stringify({ paper }) })
+  window.history.replaceState(null, '', `#${hash}`)
+  const { container } = setup()
+  expect(screen.queryByRole('region', { name: '答题卡题干' })).toBeNull()
+  clickChip('答题卡设置')
+  fireEvent.click(screen.getByRole('checkbox', { name: '显示题干' }))
+  clickChip('应用设置')
+  expect(screen.getByRole('region', { name: '答题卡题干' })).toHaveTextContent('第一题要求')
+  fireEvent.click(screen.getByRole('tab', { name: '第 2 题' }))
+  expect(screen.getByRole('region', { name: '答题卡题干' })).toHaveTextContent('第二题要求')
+  container.querySelector('.reading-display-settings')?.setAttribute('open', '')
+  fireEvent.click(screen.getByRole('checkbox', { name: '显示左侧题干' }))
+  expect(container.querySelector('#question-prompt-panel')).not.toBeVisible()
+  expect(screen.getByText('材料正文')).toBeVisible()
+  expect(screen.getByRole('region', { name: '答题卡题干' })).toHaveTextContent('第二题要求')
+  fireEvent.click(screen.getByRole('tab', { name: '第 1 题' }))
+  expect(screen.getByRole('region', { name: '答题卡题干' })).toHaveTextContent('第一题要求')
+})

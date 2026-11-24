@@ -65,7 +65,7 @@ const promptColors = {
   '#edf5ef': '浅绿',
   '#f3eff9': '浅紫',
 }
-const readingDefaults = { fontSize: 16, lineHeight: 1.75, paragraphGap: 8, promptColor: '#f6f8fb', paragraphNumbers: false }
+const readingDefaults = { fontSize: 16, lineHeight: 1.75, paragraphGap: 8, promptColor: '#f6f8fb', paragraphNumbers: false, showPrompt: true }
 
 function readDisplaySettings() {
   try {
@@ -75,6 +75,7 @@ function readDisplaySettings() {
       lineHeight: readingOptions.lineHeight.includes(saved.lineHeight) ? Number(saved.lineHeight) : readingDefaults.lineHeight,
       paragraphGap: readingOptions.paragraphGap.includes(saved.paragraphGap) ? Number(saved.paragraphGap) : readingDefaults.paragraphGap,
       promptColor: Object.prototype.hasOwnProperty.call(promptColors, saved.promptColor) ? String(saved.promptColor) : readingDefaults.promptColor,
+      showPrompt: saved.showPrompt !== false,
       paragraphNumbers: typeof saved.paragraphNumbers === 'boolean'
         ? saved.paragraphNumbers : localStorage.getItem('shenlun-paragraph-numbers') === '1',
     }
@@ -164,6 +165,8 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
                 {readingOptions.paragraphGap.map((gap) => <option key={gap} value={gap}>{gap} px</option>)}
               </select>
             </label>
+            <label><input type="checkbox" checked={display.showPrompt}
+              onChange={(event) => updateDisplay({ showPrompt: event.target.checked })} />显示左侧题干</label>
             <label>题干底色
               <select value={display.promptColor} onChange={(event) => updateDisplay({ promptColor: event.target.value })}>
                 {Object.entries(promptColors).map(([color, name]) => <option key={color} value={color}>{name}</option>)}
@@ -188,7 +191,7 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
         <button type="submit" className="btn btn--primary">保存方案</button>
         <button type="button" className="btn" onClick={() => setMarkSetEdit(null)}>取消</button>
       </form>}
-      <div className="question-prompt-content" id="question-prompt-panel"
+      <div className="question-prompt-content" id="question-prompt-panel" hidden={!display.showPrompt}
         role={questions.length > 1 ? 'tabpanel' : undefined}
         aria-labelledby={questions.length > 1 ? `question-prompt-panel-tab-${questionIndex}` : undefined}>
         <AnnotatedText key={`${activeMarkSet.id}-prompt-${questionIndex}`} text={prompt} source={`prompt-${questionIndex}`}

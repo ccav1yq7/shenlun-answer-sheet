@@ -310,6 +310,7 @@ interface PageViewProps {
   caretColumn: number
   caretFraction: number
   card?: AnswerCardDetails
+  prompt?: string
   review?: ReactNode
   onIdentityChange?: (field: 'candidateName' | 'admissionNumber', value: string) => void
   showTemplate: boolean
@@ -332,6 +333,7 @@ function PageViewInner({
   caretColumn,
   caretFraction,
   card,
+  prompt,
   review,
   onIdentityChange,
   showTemplate,
@@ -355,7 +357,7 @@ function PageViewInner({
           </>
         )}
 
-        <div className={`sheet-header${display.instructions ? '' : ' sheet-header--compact'}`}>
+        <div className={`sheet-header${display.instructions ? '' : ' sheet-header--compact'}${isFirst && prompt ? ' sheet-header--with-prompt' : ''}`}>
           {isFirst && showTemplate && (
             <div className="absent-box">
               <span>
@@ -405,6 +407,10 @@ function PageViewInner({
               </ol>}
             </div>
           )}
+          {isFirst && prompt && <section className="notice sheet-question-prompt" aria-label="答题卡题干" tabIndex={interactive ? 0 : undefined}>
+            <b>题干</b>
+            <div>{prompt}</div>
+          </section>}
         </div>
 
         {/* 中间那条竖向虚线只在左右两栏版式下才有意义；A4 单栏时画上去会横穿答题区 */}
@@ -469,6 +475,7 @@ export interface SheetViewProps {
   caretColumn: number
   caretFraction: number
   card?: AnswerCardDetails
+  prompt?: string
   review?: ReactNode
   onIdentityChange?: (field: 'candidateName' | 'admissionNumber', value: string) => void
   showTemplate: boolean

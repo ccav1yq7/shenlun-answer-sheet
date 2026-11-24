@@ -6,6 +6,7 @@ const displayOptions = {
   title: '申论答题卡标题',
   identity: '姓名与准考证号',
   instructions: '注意事项',
+  prompt: '显示题干',
   review: '复盘笔记区域',
 } as const
 
@@ -51,7 +52,7 @@ export function AnswerCardDialog({ card, adding, onSave, onClose }: {
         <legend>答题卡显示内容</legend>
         {(Object.keys(displayOptions) as (keyof typeof displayOptions)[]).map((key) => (
           <label key={key}>
-            <input type="checkbox" checked={draft.display[key]} onChange={(event) => {
+            <input type="checkbox" checked={Boolean(draft.display[key])} onChange={(event) => {
               const checked = event.target.checked
               setDraft((current) => ({ ...current, display: { ...current.display, [key]: checked } }))
             }} />
