@@ -28,6 +28,7 @@ async function* captureGridPages(source: HTMLElement) {
     const pages = Array.from(source.querySelectorAll<HTMLElement>('.sheet-page:not(.sheet-page--review-only)'), (page) => {
       const clone = page.cloneNode(true) as HTMLElement
       clone.style.boxShadow = 'none'
+      clone.querySelectorAll('.panel--inactive').forEach((panel) => panel.classList.remove('panel--inactive'))
       clone.querySelectorAll<HTMLElement>('.glyph, .attach').forEach((ink) => {
         ink.style.color = '#000'
         ink.style.setProperty('-webkit-text-stroke', '0.55px #000')
