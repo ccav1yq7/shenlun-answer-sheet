@@ -85,6 +85,12 @@ function questionCapacity(prompt: string): number {
   return limit ? Math.max(1, Math.min(20000, Number(limit[2] ?? limit[1]))) : 300
 }
 
+function importedCapacity(question: { prompt: string; capacity?: number }): number {
+  const { capacity } = question
+  return typeof capacity === 'number' && Number.isInteger(capacity) && capacity > 0 && capacity <= 10000
+    ? capacity : questionCapacity(question.prompt)
+}
+
 export default function App() {
   const [defaults, setDefaults] = useState(readPracticeDefaults)
   const [sheet, setSheet] = useState<AnswerSheet>(() => {
@@ -168,17 +174,32 @@ export default function App() {
     window.history.replaceState(null, '', window.location.pathname + window.location.search + (hash ? `#${hash}` : ''))
     try {
       const data = JSON.parse(payload)
-      if (typeof data?.prompt !== 'string' || !data.prompt.trim() || typeof data.materials !== 'string') {
-        throw new Error('invalid question')
+      let capacity = data?.capacity
+      if (data?.paper) {
+        const { title, sections, questions } = data.paper
+        if (typeof title !== 'string' || !Array.isArray(sections) || !sections.length
+          || sections.some((section) => typeof section?.label !== 'string' || typeof section?.text !== 'string' || !section.text.trim())
+          || !Array.isArray(questions) || questions.length < 2
+          || questions.some((item) => typeof item?.label !== 'string' || typeof item?.prompt !== 'string' || !item.prompt.trim())) {
+          throw new Error('invalid paper')
+        }
+        capacity = importedCapacity(questions[0])
+        const materials = sections.map(({ label, text }) => `${label}\n${text}`).join('\n\n')
+        setQuestion({ prompt: `${questions[0].label}\n${questions[0].prompt}`, materials,
+          paper: { title, materials, sections, questions }, questionIndex: 0 })
+      } else {
+        if (typeof data?.prompt !== 'string' || !data.prompt.trim() || typeof data.materials !== 'string') {
+          throw new Error('invalid question')
+        }
+        setQuestion({
+          prompt: data.prompt, materials: data.materials,
+          assistantLink: typeof data.assistantLink === 'string' ? data.assistantLink : undefined,
+        })
       }
-      setQuestion({
-        prompt: data.prompt, materials: data.materials,
-        assistantLink: typeof data.assistantLink === 'string' ? data.assistantLink : undefined,
-      })
-      if (Number.isInteger(data.capacity) && data.capacity > 0 && data.capacity <= 10000) {
+      if (Number.isInteger(capacity) && capacity > 0 && capacity <= 10000) {
         setSheet((current) => ({
           ...current,
-          blocks: current.blocks.map((block) => ({ ...block, capacity: data.capacity })),
+          blocks: current.blocks.map((block) => ({ ...block, capacity })),
         }))
       }
     } catch {
@@ -328,7 +349,7 @@ export default function App() {
     const selected = question.paper.questions[index]
     if (!selected) return
     questionAnswers.current.set(question.questionIndex ?? 0, { sheet, activeBlockId })
-    const capacity = questionCapacity(selected.prompt)
+    const capacity = importedCapacity(selected)
     const restored = questionAnswers.current.get(index)
     const fresh = createSheet('single', capacity)
     fresh.blocks[0].title = selected.label
@@ -1495,7 +1516,7 @@ export default function App() {
                   }
                   const selected = imported.paper?.questions[imported.questionIndex ?? 0]
                   if (selected) updateBlock(activeBlock.id, {
-                    capacity: questionCapacity(selected.prompt),
+                    capacity: importedCapacity(selected),
                     title: selected.label,
                   })
                 }

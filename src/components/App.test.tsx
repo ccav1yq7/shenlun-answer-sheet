@@ -734,3 +734,30 @@ describe('打印容器', () => {
     })
   })
 })
+
+it('导入粉笔五题套卷后可切题，并保留每题的答案和容量', () => {
+  const questions = Array.from({ length: 5 }, (_, index) => ({
+    label: `第 ${index + 1} 题`,
+    prompt: `套卷题干 ${index + 1}`,
+    capacity: (index + 1) * 100,
+  }))
+  const hash = new URLSearchParams({
+    'fenbi-question': JSON.stringify({
+      paper: { title: '申论套卷', questions, sections: [{ label: '材料 1', text: '套卷材料正文' }] },
+    }),
+  })
+  window.history.replaceState(null, '', `#${hash}`)
+  const { textarea } = setup()
+  expect(screen.getByText('套卷题干 1')).toBeInTheDocument()
+  expect(screen.getByText('套卷材料正文')).toBeInTheDocument()
+  type(textarea, '第一题的答案')
+  fireEvent.click(screen.getByRole('tab', { name: '第 5 题' }))
+  expect(screen.getByText('套卷题干 5')).toBeInTheDocument()
+  expect(textarea).toHaveValue('')
+  type(textarea, '第五题的答案')
+  fireEvent.click(screen.getByRole('tab', { name: '第 1 题' }))
+  expect(textarea).toHaveValue('第一题的答案')
+  fireEvent.click(screen.getByRole('tab', { name: '第 5 题' }))
+  expect(textarea).toHaveValue('第五题的答案')
+  expect(screen.getByText('500', { selector: 'b' })).toBeInTheDocument()
+})

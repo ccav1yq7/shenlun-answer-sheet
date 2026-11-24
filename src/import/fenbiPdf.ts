@@ -10,7 +10,7 @@ export interface FenbiPaper {
   title: string
   materials: string
   sections: { label: string; text: string }[]
-  questions: { label: string; prompt: string }[]
+  questions: { label: string; prompt: string; capacity?: number }[]
 }
 
 function joinLines(lines: Line[], material: boolean) {
