@@ -94,16 +94,8 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
   const sections = useMemo(() => materialSections(question.materials), [question.materials])
   const questions = question.paper?.questions ?? []
   const questionIndex = question.questionIndex ?? 0
-  const [selectedMaterial, setSelectedMaterial] = useState<{ question: number; index: number } | null>(null)
-  const materialReference = question.prompt.match(/(?:资料|材料)\s*([一二三四五六七八九十\d]+)/)?.[1]
-  const ordinal = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
-  const matchingMaterial = sections.findIndex(({ label }) => {
-    const id = label.replace('材料', '')
-    return id === materialReference
-      || (materialReference !== undefined && (ordinal[Number(id)] === materialReference || String(ordinal.indexOf(id)) === materialReference))
-  })
-  const materialIndex = selectedMaterial?.question === questionIndex
-    ? Math.min(selectedMaterial.index, sections.length - 1) : Math.max(0, matchingMaterial)
+  const [selectedMaterial, setSelectedMaterial] = useState(0)
+  const materialIndex = Math.max(0, Math.min(selectedMaterial, sections.length - 1))
   const pane = useRef<HTMLElement>(null)
   const drag = useRef<{ pointer: number; x: number; width: number; available: number } | null>(null)
 
@@ -139,7 +131,7 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
         {questions.length > 1 && <Tabs label="切换题目" items={questions.map((item) => item.label)}
           value={questionIndex} onChange={onQuestionChange} panel="question-prompt-panel" />}
         {sections.length > 0 && <Tabs label="切换材料" items={sections.map((item) => item.label)}
-          value={materialIndex} onChange={(index) => setSelectedMaterial({ question: questionIndex, index })}
+          value={materialIndex} onChange={setSelectedMaterial}
           panel="question-material-panel" />}
       </div>
       <div className="reading-mark-sets">
