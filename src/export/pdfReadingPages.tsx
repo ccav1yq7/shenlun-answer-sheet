@@ -6,6 +6,7 @@ import type { ReadingMarkSet } from '../document/practiceStore'
 import { defaultMarkPresets, readReadingPreferences } from '../document/readingMarks'
 import { materialSections, orderReadingMarks, questionReadingSources } from '../document/readingOrder'
 import { toCanvas } from 'html-to-image'
+import { pdfRasterBreak } from './pdfRasterBreak'
 
 export async function* pdfReadingPages(
   host: HTMLElement,
@@ -49,44 +50,23 @@ export async function* pdfReadingPages(
         </section>)}
       </>))
       await document.fonts.ready
-      const origin = reading.getBoundingClientRect().top
-      const occupied: { top: number; bottom: number }[] = []
-      const walker = document.createTreeWalker(reading, NodeFilter.SHOW_TEXT)
-      const range = document.createRange()
-      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-        if (!node.textContent?.trim() || node.parentElement?.closest('button.reading-icon-button, button.reading-index-button')) continue
-        range.selectNodeContents(node)
-        for (const rect of range.getClientRects()) {
-          if (rect.height && rect.width) occupied.push({ top: rect.top - origin, bottom: rect.bottom - origin })
-        }
-      }
-      reading.querySelectorAll('mark').forEach((mark) => {
-        for (const rect of mark.getClientRects()) {
-          occupied.push({ top: rect.top - origin - 10, bottom: rect.bottom - origin + 4 })
-        }
-      })
-      const total = reading.scrollHeight
-      const contentWidth = reading.offsetWidth
       const raster = await toCanvas(reading, { pixelRatio: 2, backgroundColor: '#fff' })
-      const scaleX = raster.width / contentWidth
-      const scaleY = raster.height / total
+      const rasterContext = raster.getContext('2d')
+      if (!rasterContext) throw new Error('无法读取标记页面')
+      const pixelsPerCssPixel = raster.width / reading.offsetWidth
+      const pageCapacity = Math.floor((height - 2 * margin) * pixelsPerCssPixel)
       const page = document.createElement('canvas')
       page.width = width * 2
       page.height = height * 2
       const context = page.getContext('2d')
       if (!context) throw new Error('无法生成标记页面')
-      for (let start = 0; start < total;) {
-        let end = Math.min(total, start + height - 2 * margin)
-        let crossing = occupied.find(({ top, bottom }) => top < end && bottom > end)
-        while (crossing && crossing.top > start + 16) {
-          end = Math.floor(crossing.top)
-          crossing = occupied.find(({ top, bottom }) => top < end && bottom > end)
-        }
+      for (let start = 0; start < raster.height;) {
+        const end = pdfRasterBreak(rasterContext, start, Math.min(raster.height, start + pageCapacity))
         const slice = end - start
         context.fillStyle = '#fff'
         context.fillRect(0, 0, page.width, page.height)
-        context.drawImage(raster, 0, start * scaleY, contentWidth * scaleX, slice * scaleY,
-          margin * 2, margin * 2, contentWidth * 2, slice * 2)
+        context.drawImage(raster, 0, start, raster.width, slice,
+          margin * 2, margin * 2, (width - 2 * margin) * 2, slice * 2 / pixelsPerCssPixel)
         yield await new Promise<Blob>((resolve, reject) => page.toBlob((blob) => {
           if (blob) resolve(blob)
           else reject(new Error('无法生成标记页面'))
