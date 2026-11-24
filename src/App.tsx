@@ -22,6 +22,7 @@ import { AnswerCardDialog } from './components/AnswerCardDialog'
 import { PdfExportDialog } from './components/PdfExportDialog'
 import type { PdfOptions } from './components/PdfExportDialog'
 import { exportGridPdf, exportImages } from './export/exportImages'
+import { pdfReadingPages } from './export/pdfReadingPages'
 import { pdfGridSources } from './export/pdfGridSource'
 import { PracticeDialog } from './components/PracticeDialog'
 import {
@@ -952,11 +953,9 @@ export default function App() {
 
   async function downloadPdf(options: PdfOptions) {
     if (exporting) return
-    const front = questionBlocks(question, options)
-    for (const set of pdfMarkChoices.filter((choice) => options.markIds.includes(choice.id))) {
-      const ordered = orderReadingMarks(set.marks, question ? questionReadingSources(question) : [])
-      front.push({ ...readingNotesBlock(ordered), title: `标记与笔记 · ${set.name}` })
-    }
+    const selectedSets = question && ((options.prompt && question.prompt) || (options.materials && question.materials))
+      ? pdfMarkChoices.filter((choice) => options.markIds.includes(choice.id)) : []
+    const front = selectedSets.length ? [] : questionBlocks(question, options)
     const blocks = options.answer
       ? pdfCardChoices.filter((choice) => options.cardIds.includes(choice.id)).map((choice) => choice.block) : []
     if (options.review) {
@@ -965,18 +964,21 @@ export default function App() {
         if (review) front.push({ ...createBlock(`${block.title} · 复盘笔记`, 0, false), text: review })
       }
     }
-    if (!front.length && !blocks.length) return
+    if (!front.length && !blocks.length && !selectedSets.length) return
     setPdfError('')
     setExporting(true)
     try {
-      if (!blocks.length || options.style === 'text') {
+      if (!selectedSets.length && (!blocks.length || options.style === 'text')) {
         await handleExportPdf({ ...sheet, blocks: [...front, ...blocks] })
       } else {
         const host = exportSourceRef.current?.closest<HTMLElement>('.app')
         if (!host) throw new Error('答题卡尚未就绪')
+        const grid = options.style !== 'text' && blocks.length > 0
+        const textBlocks = grid ? front : [...front, ...blocks]
         await exportGridPdf(
-          pdfGridSources(host, blocks, sheet, profile, paperSize === 'a4', options.style === 'plain-grid'),
-          front.length ? { ...sheet, blocks: front } : undefined,
+          grid ? pdfGridSources(host, blocks, sheet, profile, paperSize === 'a4', options.style === 'plain-grid') : undefined,
+          textBlocks.length ? { ...sheet, blocks: textBlocks } : undefined,
+          question && selectedSets.length ? pdfReadingPages(host, question, options, selectedSets) : undefined,
         )
         showToast('已导出 PDF')
       }

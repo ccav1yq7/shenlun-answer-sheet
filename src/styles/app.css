@@ -1360,3 +1360,14 @@ select:focus-visible,
   color: #a3241c;
   overflow-wrap: anywhere;
 }
+
+.pdf-reading-source {
+  padding-top: 5px;
+  font: 16px/1.9 var(--font-ui);
+  overflow-wrap: anywhere;
+}
+
+.pdf-reading-source h1 { margin: 0 0 16px; font-size: 22px; }
+.pdf-reading-source h2 { margin: 0; font-size: 17px; }
+.pdf-reading-source .reading-index-button,
+.pdf-reading-source .reading-icon-button { display: none; }

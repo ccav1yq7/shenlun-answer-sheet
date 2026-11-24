@@ -32,8 +32,8 @@ export function PdfExportDialog({ defaults, hasPrompt, hasMaterials, marks, card
   const [options, setOptions] = useState(defaults)
   useEffect(() => { dialog.current?.showModal() }, [])
   const hasCards = options.answer && options.cardIds.length > 0
-  const canExport = (!options.answer || hasCards)
-    && ((options.prompt && hasPrompt) || (options.materials && hasMaterials) || hasCards || options.markIds.length > 0)
+  const hasReading = (options.prompt && hasPrompt) || (options.materials && hasMaterials)
+  const canExport = (!options.answer || hasCards) && (hasReading || hasCards)
 
   function choices(key: 'markIds' | 'cardIds', items: Choice[]) {
     return items.map(({ id, name }) => <label key={id}>
@@ -58,8 +58,8 @@ export function PdfExportDialog({ defaults, hasPrompt, hasMaterials, marks, card
           {label}
         </label>)}
       </fieldset>
-      {marks.length > 0 && <fieldset disabled={busy}>
-        <legend>标记与笔记方案（附录）</legend>
+      {marks.length > 0 && hasReading && <fieldset disabled={busy}>
+        <legend>原文标记方案</legend>
         {choices('markIds', marks)}
       </fieldset>}
       {options.answer && <fieldset disabled={busy}>

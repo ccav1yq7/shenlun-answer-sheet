@@ -28,6 +28,11 @@ async function* captureGridPages(source: HTMLElement) {
     const pages = Array.from(source.querySelectorAll<HTMLElement>('.sheet-page:not(.sheet-page--review-only)'), (page) => {
       const clone = page.cloneNode(true) as HTMLElement
       clone.style.boxShadow = 'none'
+      clone.querySelectorAll<HTMLElement>('.glyph, .attach').forEach((ink) => {
+        ink.style.color = '#000'
+        ink.style.setProperty('-webkit-text-stroke', '0.55px #000')
+      })
+      clone.querySelectorAll('.cell--space').forEach((cell) => cell.classList.remove('cell--space'))
       clone.querySelector('.answer-card-review')?.remove()
       const identityFields = page.querySelectorAll<HTMLInputElement>('.sheet-identity-input')
       clone.querySelectorAll<HTMLInputElement>('.sheet-identity-input').forEach((field, index) => {
@@ -123,23 +128,31 @@ export interface GridPdfSource {
   geometry: SheetGeometry
 }
 
-export async function exportGridPdf(sources: AsyncIterable<GridPdfSource>, frontMatter?: AnswerSheet) {
+export async function exportGridPdf(
+  sources: AsyncIterable<GridPdfSource> | undefined,
+  frontMatter?: AnswerSheet,
+  readingPages?: AsyncIterable<Blob>,
+) {
   const pdf = await PDFDocument.create()
   const addPage = async (image: Blob, width: number, height: number) => {
     const png = await pdf.embedPng(await image.arrayBuffer())
     const page = pdf.addPage([width, height])
     page.drawImage(png, { x: 0, y: 0, width, height })
   }
+  if (readingPages) {
+    for await (const image of readingPages) await addPage(image, 210 * 72 / 25.4, 297 * 72 / 25.4)
+  }
   if (frontMatter) {
     for await (const image of captureTextPages(frontMatter)) {
       await addPage(image, 210 * 72 / 25.4, 297 * 72 / 25.4)
     }
   }
-  for await (const { source, geometry } of sources) {
+  for await (const { source, geometry } of sources ?? []) {
     for await (const image of captureGridPages(source)) {
       await addPage(image, geometry.pageWidth * 72 / 25.4, geometry.pageHeight * 72 / 25.4)
     }
   }
+  if (!pdf.getPageCount()) throw new Error('没有可导出的页面')
   const bytes = await pdf.save()
   downloadBlob(new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }), `申论方格答题卡-${timestamp()}.pdf`)
 }
