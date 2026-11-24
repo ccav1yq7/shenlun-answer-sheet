@@ -41,7 +41,7 @@ function Tabs({ label, items, value, onChange, panel }: {
     event.currentTarget.parentElement?.querySelectorAll('button')[next]?.focus()
   }
 
-  return <div className="question-tabs" role="tablist" aria-label={label}>
+  return <div className={panel === 'question-material-panel' ? 'question-tabs question-tabs--materials' : 'question-tabs'} role="tablist" aria-label={label}>
     {items.map((item, index) => (
       <button type="button" role="tab" id={`${panel}-tab-${index}`} key={index}
         aria-selected={value === index} aria-controls={panel} tabIndex={value === index ? 0 : -1}
@@ -127,13 +127,8 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
         '--reading-paragraph-gap': `${display.paragraphGap}px`,
         '--reading-prompt-color': display.promptColor,
       } as CSSProperties}>
-      <div className="question-pane-tabs">
-        {questions.length > 1 && <Tabs label="切换题目" items={questions.map((item) => item.label)}
-          value={questionIndex} onChange={onQuestionChange} panel="question-prompt-panel" />}
-        {sections.length > 0 && <Tabs label="切换材料" items={sections.map((item) => item.label)}
-          value={materialIndex} onChange={setSelectedMaterial}
-          panel="question-material-panel" />}
-      </div>
+      {questions.length > 1 && <Tabs label="切换题目" items={questions.map((item) => item.label)}
+        value={questionIndex} onChange={onQuestionChange} panel="question-prompt-panel" />}
       <div className="reading-mark-sets">
         <label>标记方案
           <select aria-label="切换标记方案" value={activeMarkSet.id} onChange={(event) => {
@@ -151,23 +146,6 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
         <button className="btn" type="button" onClick={() => setMarkSetEdit({
           create: false, name: activeMarkSet.name,
         })}>重命名</button>
-      </div>
-      {markSetEdit && <form className="reading-mark-sets" onSubmit={(event) => {
-        event.preventDefault()
-        const name = markSetEdit.name.trim()
-        if (!name) return
-        onSaveMarkSet(name, markSetEdit.create)
-        setMarkSetEdit(null)
-      }}>
-        <label>方案名称
-          <input autoFocus required maxLength={40} value={markSetEdit.name}
-            onChange={(event) => setMarkSetEdit({ ...markSetEdit, name: event.target.value })} />
-        </label>
-        <button type="submit" className="btn btn--primary">保存方案</button>
-        <button type="button" className="btn" onClick={() => setMarkSetEdit(null)}>取消</button>
-      </form>}
-      <div className="reading-options">
-        <p className="reading-hint">选中文字可标记或写笔记</p>
         <details className="reading-display-settings">
           <summary className="btn">显示设置</summary>
           <div className="reading-display-fields">
@@ -196,12 +174,28 @@ export function QuestionPane({ question, onQuestionChange, zoomOffset, widthPerc
           </div>
         </details>
       </div>
+      {markSetEdit && <form className="reading-mark-sets" onSubmit={(event) => {
+        event.preventDefault()
+        const name = markSetEdit.name.trim()
+        if (!name) return
+        onSaveMarkSet(name, markSetEdit.create)
+        setMarkSetEdit(null)
+      }}>
+        <label>方案名称
+          <input autoFocus required maxLength={40} value={markSetEdit.name}
+            onChange={(event) => setMarkSetEdit({ ...markSetEdit, name: event.target.value })} />
+        </label>
+        <button type="submit" className="btn btn--primary">保存方案</button>
+        <button type="button" className="btn" onClick={() => setMarkSetEdit(null)}>取消</button>
+      </form>}
       <div className="question-prompt-content" id="question-prompt-panel"
         role={questions.length > 1 ? 'tabpanel' : undefined}
         aria-labelledby={questions.length > 1 ? `question-prompt-panel-tab-${questionIndex}` : undefined}>
         <AnnotatedText key={`${activeMarkSet.id}-prompt-${questionIndex}`} text={prompt} source={`prompt-${questionIndex}`}
           heading="题干" label={questions[questionIndex]?.label ?? '题干'} marks={marks} noteNumbers={noteNumbers} presets={presets} notePreferences={notePreferences} onSave={onSaveMark} onRemove={onRemoveMark} />
       </div>
+      {sections.length > 0 && <Tabs label="切换材料" items={sections.map((item) => item.label)}
+        value={materialIndex} onChange={setSelectedMaterial} panel="question-material-panel" />}
       {(sections[materialIndex] || question.materials) && (
         <div className="question-material-content" id="question-material-panel" key={materialIndex}
           role={sections.length > 0 ? 'tabpanel' : undefined}

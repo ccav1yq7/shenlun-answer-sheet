@@ -19,6 +19,10 @@ import { MarkPresetDialog } from './components/MarkPresetDialog'
 import { readReadingPreferences, syncMarkPresets } from './document/readingMarks'
 import type { ReadingMark } from './components/AnnotatedText'
 import { AnswerCardDialog } from './components/AnswerCardDialog'
+import { PdfExportDialog } from './components/PdfExportDialog'
+import type { PdfOptions } from './components/PdfExportDialog'
+import { exportGridPdf, exportImages } from './export/exportImages'
+import { pdfGridSources } from './export/pdfGridSource'
 import { PracticeDialog } from './components/PracticeDialog'
 import {
   getPracticeDirectory, readPracticeDefaults, readPracticeLocation, reloadPractice,
@@ -219,6 +223,8 @@ export default function App() {
   const [paperSize, setPaperSize] = useState<'auto' | 'a4'>(defaults.paperSize === 'a4' ? 'a4' : 'auto')
   const [keepExportFormat, setKeepExportFormat] = useState(defaults.keepExportFormat ?? true)
   const [exporting, setExporting] = useState(false)
+  const [pdfDialog, setPdfDialog] = useState(false)
+  const [pdfError, setPdfError] = useState('')
   const [cardDialog, setCardDialog] = useState<'add' | 'edit' | null>(null)
   const exportSourceRef = useRef<HTMLDivElement | null>(null)
   const printRef = useRef<HTMLDivElement | null>(null)
@@ -926,7 +932,63 @@ export default function App() {
   const activeMarks = orderReadingMarks(marks, question ? questionReadingSources(question) : [])
     .filter((mark) => !mark.source.startsWith('prompt-') || mark.source === `prompt-${question?.questionIndex ?? 0}`)
 
-  const handleExport = async (format: '图片' | 'Word' | 'PDF') => {
+  const pdfCardChoices = pdfDialog ? sheet.blocks.flatMap((block) => {
+    const active = activeAnswerCard(block)
+    const options = [
+      { card: active, block },
+      ...(block.otherCards ?? []).map((saved) => ({
+        card: saved,
+        block: { ...block, text: saved.text, paragraphStyles: saved.paragraphStyles, indentFirstLine: saved.indentFirstLine },
+      })),
+    ]
+    return options.map((item) => ({
+      id: JSON.stringify([block.id, item.card.id]),
+      name: `${block.title} · ${item.card.name}`,
+      current: item.card.id === active.id,
+      block: { ...item.block, card: item.card, title: `${block.title} · ${item.card.name}` },
+    }))
+  }) : []
+  const pdfMarkChoices = pdfDialog ? markSets.filter((set) => set.marks.length > 0) : []
+
+  async function downloadPdf(options: PdfOptions) {
+    if (exporting) return
+    const front = questionBlocks(question, options)
+    for (const set of pdfMarkChoices.filter((choice) => options.markIds.includes(choice.id))) {
+      const ordered = orderReadingMarks(set.marks, question ? questionReadingSources(question) : [])
+      front.push({ ...readingNotesBlock(ordered), title: `标记与笔记 · ${set.name}` })
+    }
+    const blocks = options.answer
+      ? pdfCardChoices.filter((choice) => options.cardIds.includes(choice.id)).map((choice) => choice.block) : []
+    if (options.review) {
+      for (const block of blocks) {
+        const review = block.card?.review.trim()
+        if (review) front.push({ ...createBlock(`${block.title} · 复盘笔记`, 0, false), text: review })
+      }
+    }
+    if (!front.length && !blocks.length) return
+    setPdfError('')
+    setExporting(true)
+    try {
+      if (!blocks.length || options.style === 'text') {
+        await handleExportPdf({ ...sheet, blocks: [...front, ...blocks] })
+      } else {
+        const host = exportSourceRef.current?.closest<HTMLElement>('.app')
+        if (!host) throw new Error('答题卡尚未就绪')
+        await exportGridPdf(
+          pdfGridSources(host, blocks, sheet, profile, paperSize === 'a4', options.style === 'plain-grid'),
+          front.length ? { ...sheet, blocks: front } : undefined,
+        )
+        showToast('已导出 PDF')
+      }
+      setPdfDialog(false)
+    } catch (error) {
+      setPdfError(`导出 PDF 失败：${error instanceof Error ? error.message : String(error)}`)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleExport = async (format: '图片' | 'Word') => {
     if (exporting) return
     const frontBlocks = questionBlocks(question, exportContent)
     if (exportContent.notes && activeMarks.length) frontBlocks.push(readingNotesBlock(activeMarks))
@@ -954,15 +1016,10 @@ export default function App() {
           const { exportDocx } = await import('./export/exportDocx')
           await exportDocx(exportSheet, { keepIndent: false, title })
         }
-      } else if (format === 'PDF' && !withGrid) {
-        await handleExportPdf(exportSheet, title)
-        return
       } else {
         const source = exportSourceRef.current
         if (!source) throw new Error('答题卡尚未就绪')
-        const { exportImages, exportGridPdf } = await import('./export/exportImages')
-        if (format === '图片') await exportImages(source, exportSheet, withGrid, frontMatter)
-        else await exportGridPdf(source, geometry, frontMatter)
+        await exportImages(source, exportSheet, withGrid, frontMatter)
       }
       showToast(`已导出${format}`)
     } catch (error) {
@@ -1276,7 +1333,10 @@ export default function App() {
             </details>
             {(['图片', 'Word', 'PDF'] as const).map((format) => (
               <button type="button" className="btn btn--primary" key={format}
-                disabled={exporting} onClick={() => void handleExport(format)}>
+                disabled={exporting} onClick={() => {
+                  if (format === 'PDF') { setPdfError(''); setPdfDialog(true) }
+                  else void handleExport(format)
+                }}>
                 导出{format === '图片' ? '' : ' '}{format}
               </button>
             ))}
@@ -1465,6 +1525,17 @@ export default function App() {
           onRedo={handleRedo}
           onFocusRequest={() => undefined}
         />
+
+          {pdfDialog && <PdfExportDialog
+            defaults={{
+              prompt: exportContent.prompt, materials: exportContent.materials, answer: exportContent.answer,
+              review: Boolean(exportContent.review), style: keepExportFormat ? 'grid' : 'text',
+              markIds: exportContent.notes && activeMarkSet.marks.length ? [activeMarkSet.id] : [],
+              cardIds: pdfCardChoices.filter((choice) => choice.current).map((choice) => choice.id),
+            }}
+            hasPrompt={Boolean(question?.prompt)} hasMaterials={Boolean(question?.materials)}
+            marks={pdfMarkChoices} cards={pdfCardChoices} busy={exporting} error={pdfError}
+            onClose={() => setPdfDialog(false)} onExport={(options) => void downloadPdf(options)} />}
 
           {cardDialog && (
             <AnswerCardDialog adding={cardDialog === 'add'} card={cardDialog === 'add' ? {

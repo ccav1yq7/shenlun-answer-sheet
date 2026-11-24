@@ -6,7 +6,8 @@ import {
 import type { DocumentLayout, Panel } from '../layout'
 import type { SheetGeometry } from '../sheet/geometry'
 import type { AnswerCardDetails, AnswerSheet } from '../document/model'
-import { downloadBlob, textDocxSection, timestamp } from './exportDocx'
+import { textDocxSection } from './exportDocx'
+import { downloadBlob, timestamp } from './download'
 
 const red = { style: BorderStyle.SINGLE, color: 'B74949', size: 4 }
 const hidden = { style: BorderStyle.NONE }

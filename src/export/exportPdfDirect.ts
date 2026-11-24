@@ -20,6 +20,7 @@
  * 也不能把英文单词/数字串从中间劈开。断行规则直接复用 layout 引擎里那份标点表。
  */
 
+import { downloadBlob, timestamp } from './download'
 import { PDFDocument, rgb } from 'pdf-lib'
 import fontkit from '@pdf-lib/fontkit'
 import fontUrl from '../assets/NotoSerifSC.subset.ttf?url'
@@ -252,18 +253,5 @@ export async function buildPdfBytes(sheet: AnswerSheet, options: PdfDirectOption
 export async function exportPdfDirect(sheet: AnswerSheet, options: PdfDirectOptions = {}): Promise<void> {
   const bytes = await buildPdfBytes(sheet, options)
   const blob = new Blob([bytes as unknown as BlobPart], { type: 'application/pdf' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `申论作答-${timestamp()}.pdf`
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  window.setTimeout(() => URL.revokeObjectURL(url), 10_000)
-}
-
-function timestamp(): string {
-  const d = new Date()
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`
+  downloadBlob(blob, `申论作答-${timestamp()}.pdf`)
 }

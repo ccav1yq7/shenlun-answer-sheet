@@ -1,7 +1,8 @@
+import { PDFDocument } from 'pdf-lib'
 import { toBlob } from 'html-to-image'
 import type { AnswerSheet } from '../document/model'
 import type { SheetGeometry } from '../sheet/geometry'
-import { downloadBlob, timestamp } from './exportDocx'
+import { downloadBlob, timestamp } from './download'
 
 async function capture(element: HTMLElement): Promise<Blob> {
   const result = await toBlob(element, { pixelRatio: 2, backgroundColor: '#fff' })
@@ -14,8 +15,16 @@ async function* captureGridPages(source: HTMLElement) {
   staging.setAttribute('aria-hidden', 'true')
   staging.style.cssText = 'position:fixed;left:-100000px;top:0;pointer-events:none;'
   const host = source.closest('.app') ?? source.parentElement
+  const original = source.querySelector('.sheet-page')
+  if (original) {
+    const style = getComputedStyle(original)
+    for (const name of style) {
+      if (name.startsWith('--')) staging.style.setProperty(name, style.getPropertyValue(name))
+    }
+  }
   host?.append(staging)
   try {
+    await document.fonts.ready
     const pages = Array.from(source.querySelectorAll<HTMLElement>('.sheet-page:not(.sheet-page--review-only)'), (page) => {
       const clone = page.cloneNode(true) as HTMLElement
       clone.style.boxShadow = 'none'
@@ -109,11 +118,13 @@ export async function exportImages(source: HTMLElement, sheet: AnswerSheet, keep
   }
 }
 
-export async function exportGridPdf(source: HTMLElement, geometry: SheetGeometry, frontMatter?: AnswerSheet) {
-  const { PDFDocument } = await import('pdf-lib')
+export interface GridPdfSource {
+  source: HTMLElement
+  geometry: SheetGeometry
+}
+
+export async function exportGridPdf(sources: AsyncIterable<GridPdfSource>, frontMatter?: AnswerSheet) {
   const pdf = await PDFDocument.create()
-  const width = geometry.pageWidth * 72 / 25.4
-  const height = geometry.pageHeight * 72 / 25.4
   const addPage = async (image: Blob, width: number, height: number) => {
     const png = await pdf.embedPng(await image.arrayBuffer())
     const page = pdf.addPage([width, height])
@@ -124,7 +135,11 @@ export async function exportGridPdf(source: HTMLElement, geometry: SheetGeometry
       await addPage(image, 210 * 72 / 25.4, 297 * 72 / 25.4)
     }
   }
-  for await (const image of captureGridPages(source)) await addPage(image, width, height)
+  for await (const { source, geometry } of sources) {
+    for await (const image of captureGridPages(source)) {
+      await addPage(image, geometry.pageWidth * 72 / 25.4, geometry.pageHeight * 72 / 25.4)
+    }
+  }
   const bytes = await pdf.save()
   downloadBlob(new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }), `申论方格答题卡-${timestamp()}.pdf`)
 }
