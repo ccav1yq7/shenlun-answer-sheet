@@ -38,6 +38,8 @@ export interface AnswerCardDetails {
   candidateName?: string
   admissionNumber?: string
   review: string
+  promptText?: string
+  promptFontSize?: number
   display: typeof defaultCardDisplay & { prompt?: boolean }
 }
 
@@ -65,6 +67,15 @@ export interface AnswerBlock {
 
 export function activeAnswerCard(block: AnswerBlock): AnswerCardDetails {
   return block.card ?? { id: 'original', name: '第 1 次练习', review: '', display: defaultCardDisplay }
+}
+
+export function answerCardPrompt(card: AnswerCardDetails | undefined, question: string) {
+  return card?.display.prompt ? card.promptText?.trim() || question : ''
+}
+
+export function answerCardPromptFontSize(card?: AnswerCardDetails): number {
+  const size = card?.promptFontSize
+  return typeof size === 'number' && Number.isFinite(size) && size >= 6 && size <= 24 ? size : 8
 }
 
 export type SheetMode = 'single' | 'full'

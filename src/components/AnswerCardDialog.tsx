@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { answerCardPromptFontSize } from '../document/model'
 import type { AnswerCardDetails } from '../document/model'
 
 const displayOptions = {
@@ -10,21 +11,28 @@ const displayOptions = {
   review: '复盘笔记区域',
 } as const
 
-export function AnswerCardDialog({ card, adding, onSave, onClose }: {
+export function AnswerCardDialog({ card, questionPrompt, adding, onSave, onClose }: {
   card: AnswerCardDetails
+  questionPrompt: string
   adding: boolean
   onSave: (card: AnswerCardDetails) => void
   onClose: () => void
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const [draft, setDraft] = useState(card)
+  const [fontSize, setFontSize] = useState(String(answerCardPromptFontSize(card)))
   useEffect(() => { dialog.current?.showModal() }, [])
 
   return <dialog className="question-import answer-card-dialog" ref={dialog} onClose={onClose}
     aria-labelledby="answer-card-heading">
     <form onSubmit={(event) => {
       event.preventDefault()
-      if (draft.name.trim()) onSave({ ...draft, name: draft.name.trim() })
+      if (draft.name.trim()) onSave({
+        ...draft,
+        name: draft.name.trim(),
+        promptText: draft.promptText?.trim() || undefined,
+        promptFontSize: draft.display.prompt ? Number(fontSize) : draft.promptFontSize,
+      })
     }}>
       <h2 id="answer-card-heading">{adding ? '新增答题卡' : '答题卡设置'}</h2>
       <label className="practice-name">答题卡名称
@@ -60,6 +68,21 @@ export function AnswerCardDialog({ card, adding, onSave, onClose }: {
           </label>
         ))}
       </fieldset>
+      {draft.display.prompt && <fieldset className="answer-card-prompt-fields">
+        <legend>答题卡题干</legend>
+        <label className="question-import-field">题干内容
+          <textarea rows={5} value={draft.promptText ?? questionPrompt}
+            onChange={(event) => setDraft({ ...draft, promptText: event.target.value })} />
+        </label>
+        <label>题干字号（磅）
+          <input type="number" min={6} max={24} step={0.5} required
+            value={fontSize} onChange={(event) => setFontSize(event.target.value)} />
+        </label>
+        <button className="btn" type="button" onClick={() => {
+          setDraft({ ...draft, promptText: undefined })
+          setFontSize('8')
+        }}>恢复默认题干</button>
+      </fieldset>}
       <div className="question-import-actions">
         <button type="button" className="btn" onClick={() => dialog.current?.close()}>取消</button>
         <button type="submit" className="btn btn--primary" disabled={!draft.name.trim()}>

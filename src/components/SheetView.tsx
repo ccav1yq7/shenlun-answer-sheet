@@ -10,7 +10,7 @@
 import { memo } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { buildCellGlyphs, isSpaceCell } from './cellGlyphs'
-import { defaultCardDisplay } from '../document/model'
+import { answerCardPromptFontSize, defaultCardDisplay } from '../document/model'
 import type { AnswerCardDetails } from '../document/model'
 import type { Cell, CompoundRule, DocumentLayout, Page, Panel, Row, Token } from '../layout'
 
@@ -409,7 +409,7 @@ function PageViewInner({
           )}
           {isFirst && prompt && <section className="notice sheet-question-prompt" aria-label="答题卡题干" tabIndex={interactive ? 0 : undefined}>
             <b>题干</b>
-            <div>{prompt}</div>
+            <div style={{ fontSize: `${answerCardPromptFontSize(card)}pt` }}>{prompt}</div>
           </section>}
         </div>
 

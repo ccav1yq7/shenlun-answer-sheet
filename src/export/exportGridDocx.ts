@@ -5,6 +5,7 @@ import {
 } from 'docx'
 import type { DocumentLayout, Panel } from '../layout'
 import type { SheetGeometry } from '../sheet/geometry'
+import { answerCardPromptFontSize } from '../document/model'
 import type { AnswerCardDetails, AnswerSheet } from '../document/model'
 import { textDocxSection } from './exportDocx'
 import { downloadBlob, timestamp } from './download'
@@ -84,7 +85,7 @@ export function buildGridDocxBlob(layout: DocumentLayout, geometry: SheetGeometr
           ...(card?.display.name ? [paragraph(card.name, 26)] : []),
           ...(card?.display.identity && (card.candidateName || card.admissionNumber)
             ? [paragraph(`姓名：${card.candidateName ?? ''}    准考证号：${card.admissionNumber ?? ''}`, 20)] : []),
-          ...(index === 0 && prompt ? [paragraph('题干', 24), ...prompt.split(/\r?\n/).map((line) => paragraph(line, 20))] : []),
+          ...(index === 0 && prompt ? [paragraph('题干', 24), ...prompt.split(/\r?\n/).map((line) => paragraph(line, Math.round(answerCardPromptFontSize(card) * 2)))] : []),
           paragraph(`第 ${index + 1} 页 / 共 ${layout.pages.length} 页`, 20),
           new Table({
             layout: TableLayoutType.FIXED,

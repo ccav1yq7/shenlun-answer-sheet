@@ -1,6 +1,7 @@
 import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { SheetView } from '../components/SheetView'
+import { answerCardPrompt, answerCardPromptFontSize } from '../document/model'
 import type { AnswerBlock, AnswerSheet } from '../document/model'
 import type { LayoutProfile } from '../layout'
 import { layoutDocument } from '../layout'
@@ -31,8 +32,8 @@ export async function* pdfGridSources(
       const header = plain ? 0 : display && !display.instructions
         ? 8 + (display.title ? 27 : 0) + (display.identity ? 9 : 0) + (display.name ? 17 : 0)
         : undefined
-      const prompt = !plain && block.card?.display.prompt ? questionPrompt : ''
-      const promptHeight = promptHeightFor(prompt)
+      const prompt = plain ? '' : answerCardPrompt(card, questionPrompt)
+      const promptHeight = promptHeightFor(prompt, answerCardPromptFontSize(card))
       const rows = Math.ceil(block.capacity / sheet.columns)
       const layout = forceA4 ? 'a4-single' : chooseLayout(sheet.columns, rows, sheet.mode, header, promptHeight)
       const geometry = computeGeometry({ columns: sheet.columns, layout, compactHeaderHeight: header, promptHeight })

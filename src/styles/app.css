@@ -1371,3 +1371,17 @@ select:focus-visible,
 .pdf-reading-source h2 { margin: 0; font-size: 17px; }
 .pdf-reading-source .reading-index-button,
 .pdf-reading-source .reading-icon-button { display: none; }
+
+.answer-card-prompt-fields {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  min-width: 0;
+}
+
+.answer-card-prompt-fields input[type="number"] {
+  width: 5em;
+  margin-inline-start: 8px;
+}
+
+.answer-card-prompt-fields .btn { justify-self: start; }

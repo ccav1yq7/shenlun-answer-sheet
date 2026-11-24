@@ -109,11 +109,12 @@ export interface SheetGeometry {
 }
 
 /** Reserve room for question text in the first-page header, using the narrower A4 width. */
-export function promptHeightFor(text: string): number {
+export function promptHeightFor(text: string, fontSize = 8): number {
   if (!text.trim()) return 0
+  const charactersPerLine = Math.floor(480 / fontSize)
   const lines = text.split(/\r?\n/).reduce((count, line) =>
-    count + Math.max(1, Math.ceil(Array.from(line).length / 60)), 0)
-  return Math.min(105, 15 + lines * 4.75)
+    count + Math.max(1, Math.ceil(Array.from(line).length / charactersPerLine)), 0)
+  return Math.min(105, 15 + lines * fontSize * 0.6)
 }
 
 export interface GeometryOptions {

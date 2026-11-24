@@ -37,6 +37,8 @@ import {
   CAPACITY_PRESETS,
   COLUMN_OPTIONS,
   activeAnswerCard,
+  answerCardPrompt,
+  answerCardPromptFontSize,
   appendBlock,
   blockToPlainText,
   createBlock,
@@ -260,8 +262,9 @@ export default function App() {
     : undefined
 
   const questionPrompt = question?.paper?.questions[question.questionIndex ?? 0]?.prompt ?? question?.prompt ?? ''
-  const cardPrompt = display?.prompt ? questionPrompt : ''
-  const promptHeight = useMemo(() => promptHeightFor(cardPrompt), [cardPrompt])
+  const cardPrompt = answerCardPrompt(activeBlock.card, questionPrompt)
+  const cardPromptFontSize = answerCardPromptFontSize(activeBlock.card)
+  const promptHeight = useMemo(() => promptHeightFor(cardPrompt, cardPromptFontSize), [cardPrompt, cardPromptFontSize])
 
   // 单题练习时，题目装得进一页 A4 就用 A4 纵向（纸张缩小、格子不变）；装不下才用 A3 左右两栏
   const geometry = useMemo(() => {
@@ -1549,7 +1552,7 @@ export default function App() {
             onClose={() => setPdfDialog(false)} onExport={(options) => void downloadPdf(options)} />}
 
           {cardDialog && (
-            <AnswerCardDialog adding={cardDialog === 'add'} card={cardDialog === 'add' ? {
+            <AnswerCardDialog questionPrompt={questionPrompt} adding={cardDialog === 'add'} card={cardDialog === 'add' ? {
               ...currentCard,
               sequence: otherCards.length + 2,
               name: `第 ${otherCards.length + 2} 次练习`,
