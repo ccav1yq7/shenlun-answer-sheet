@@ -70,6 +70,8 @@ export function AnswerCardDialog({ card, questionPrompt, adding, onSave, onClose
       </fieldset>
       {draft.display.prompt && <fieldset className="answer-card-prompt-fields">
         <legend>答题卡题干</legend>
+        <label><input type="checkbox" checked={draft.showPromptTitle !== false}
+          onChange={(event) => setDraft({ ...draft, showPromptTitle: event.target.checked })} />显示「题干」标题</label>
         <label className="question-import-field">题干内容
           <textarea rows={5} value={draft.promptText ?? questionPrompt}
             onChange={(event) => setDraft({ ...draft, promptText: event.target.value })} />

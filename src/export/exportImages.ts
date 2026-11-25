@@ -1,3 +1,5 @@
+import { decoratePdfPacket } from './pdfPacket'
+import type { PdfPacket } from './pdfPacket'
 import { PDFDocument } from 'pdf-lib'
 import { toBlob } from 'html-to-image'
 import type { AnswerSheet } from '../document/model'
@@ -133,6 +135,7 @@ export async function exportGridPdf(
   sources: AsyncIterable<GridPdfSource> | undefined,
   frontMatter?: AnswerSheet,
   readingPages?: AsyncIterable<Blob>,
+  packet?: PdfPacket,
 ) {
   const pdf = await PDFDocument.create()
   const addPage = async (image: Blob, width: number, height: number) => {
@@ -148,12 +151,14 @@ export async function exportGridPdf(
       await addPage(image, 210 * 72 / 25.4, 297 * 72 / 25.4)
     }
   }
+  const readingPageCount = pdf.getPageCount()
   for await (const { source, geometry } of sources ?? []) {
     for await (const image of captureGridPages(source)) {
       await addPage(image, geometry.pageWidth * 72 / 25.4, geometry.pageHeight * 72 / 25.4)
     }
   }
   if (!pdf.getPageCount()) throw new Error('没有可导出的页面')
+  if (packet) await decoratePdfPacket(pdf, packet, readingPageCount)
   const bytes = await pdf.save()
   downloadBlob(new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }), `申论方格答题卡-${timestamp()}.pdf`)
 }

@@ -18,13 +18,13 @@ export async function* pdfReadingPages(
   const sections = materialSections(question.materials)
   const sources = [
     ...(content.prompt && question.prompt ? [{
-      label: '题干', source: `prompt-${promptIndex}`,
+      label: '作答要求', source: `prompt-${promptIndex}`,
       text: question.paper?.questions[promptIndex]?.prompt ?? question.prompt,
     }] : []),
     ...(content.materials && question.materials ? sections.length
       ? sections.map(({ label, text }) => ({ label, text, source: `material-${label}` }))
       : [{ label: '材料', text: question.materials, source: 'material-all' }] : []),
-  ]
+  ].reverse()
   const width = 794
   const height = 1123
   const margin = 56
@@ -43,7 +43,8 @@ export async function* pdfReadingPages(
       const noteNumbers = new Map(marks.filter((mark) => mark.note).map((mark, index) => [mark.id, index + 1]))
       flushSync(() => root.render(<>
         <h1>{set.name}</h1>
-        {sources.map((source) => <section key={source.source}>
+        {content.materials && question.materials && <h2 className="pdf-materials-title">给定材料</h2>}
+        {sources.map((source) => <section key={source.source} className={source.source.startsWith('material-') ? 'pdf-material-section' : undefined}>
           <AnnotatedText {...source} heading={source.label} indentParagraphs={source.source.startsWith('material-')}
             marks={marks} noteNumbers={noteNumbers} presets={defaultMarkPresets} notePreferences={readReadingPreferences().note}
             onSave={() => undefined} onRemove={() => undefined} />

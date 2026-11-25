@@ -408,7 +408,7 @@ function PageViewInner({
             </div>
           )}
           {isFirst && prompt && <section className="notice sheet-question-prompt" aria-label="答题卡题干" tabIndex={interactive ? 0 : undefined}>
-            <b>题干</b>
+            {card?.showPromptTitle !== false && <b>题干</b>}
             <div style={{ fontSize: `${answerCardPromptFontSize(card)}pt` }}>{prompt}</div>
           </section>}
         </div>

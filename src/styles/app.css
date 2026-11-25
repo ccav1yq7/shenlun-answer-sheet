@@ -1385,3 +1385,17 @@ select:focus-visible,
 }
 
 .answer-card-prompt-fields .btn { justify-self: start; }
+
+.pdf-reading-source .pdf-materials-title {
+  margin: 0 0 14px;
+  color: #243e61;
+  font-size: 19px;
+}
+
+.pdf-reading-source .pdf-material-section .reading-heading h2 {
+  padding: 1px 8px;
+  border-radius: 4px;
+  background: #edf3fb;
+  color: #284f83;
+  font-size: 14px;
+}

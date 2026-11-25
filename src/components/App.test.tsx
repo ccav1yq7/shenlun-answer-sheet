@@ -806,6 +806,7 @@ it('答题卡题干随题目切换，左侧题干可独立隐藏', () => {
   expect(screen.getByText('自定义作答要求').style.fontSize).toBe('14pt')
   clickChip('答题卡设置')
   clickChip('恢复默认题干')
+  fireEvent.click(screen.getByRole('checkbox', { name: '显示「题干」标题' }))
   clickChip('应用设置')
-  expect(screen.getByRole('region', { name: '答题卡题干' })).toHaveTextContent('第一题要求')
+  expect(screen.getByRole('region', { name: '答题卡题干' })).toHaveTextContent(/^第一题要求$/)
 })

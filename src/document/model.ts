@@ -40,6 +40,7 @@ export interface AnswerCardDetails {
   review: string
   promptText?: string
   promptFontSize?: number
+  showPromptTitle?: boolean
   display: typeof defaultCardDisplay & { prompt?: boolean }
 }
 

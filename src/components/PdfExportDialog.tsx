@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 export interface PdfOptions {
+  cover: boolean
   prompt: boolean
   materials: boolean
   answer: boolean
@@ -50,6 +51,8 @@ export function PdfExportDialog({ defaults, hasPrompt, hasMaterials, marks, card
       <h2 id="pdf-export-title">导出 PDF</h2>
       <fieldset disabled={busy}>
         <legend>导出内容</legend>
+        <label><input type="checkbox" checked={options.cover}
+          onChange={({ target }) => setOptions({ ...options, cover: target.checked })} />试卷封面</label>
         {([
           ['prompt', '题干', hasPrompt], ['materials', '材料', hasMaterials], ['answer', '答题卡', true],
         ] as const).map(([key, label, available]) => <label key={key}>

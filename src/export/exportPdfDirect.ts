@@ -20,6 +20,8 @@
  * 也不能把英文单词/数字串从中间劈开。断行规则直接复用 layout 引擎里那份标点表。
  */
 
+import { decoratePdfPacket } from './pdfPacket'
+import type { PdfPacket } from './pdfPacket'
 import { downloadBlob, timestamp } from './download'
 import { PDFDocument, rgb } from 'pdf-lib'
 import fontkit from '@pdf-lib/fontkit'
@@ -51,6 +53,7 @@ const BLOCK_GAP = 10
 const INK = rgb(0, 0, 0)
 
 export interface PdfDirectOptions {
+  packet?: PdfPacket
   title?: string
   keepIndent?: boolean
   blocks?: AnswerBlock[]
@@ -233,10 +236,10 @@ export async function buildPdfBytes(sheet: AnswerSheet, options: PdfDirectOption
   }
 
   blocks.forEach((block, blockIndex) => {
-    if (blocks.length > 1) {
+    if (options.packet || blocks.length > 1) {
       if (blockIndex > 0) y -= BLOCK_GAP
-      ensureRoom(BLOCK_TITLE_SIZE + BLOCK_GAP)
-      page.drawText(`【${block.title}】`, { x: MARGIN, y: y - BLOCK_TITLE_SIZE, size: BLOCK_TITLE_SIZE, font, color: INK })
+      ensureRoom(BLOCK_TITLE_SIZE + BLOCK_GAP + LINE_HEIGHT)
+      page.drawText(options.packet ? block.title : `【${block.title}】`, { x: MARGIN, y: y - BLOCK_TITLE_SIZE, size: BLOCK_TITLE_SIZE, font, color: INK })
       y -= BLOCK_TITLE_SIZE + BLOCK_GAP
     }
     const paragraphs = splitParagraphs(block.text)
@@ -246,6 +249,7 @@ export async function buildPdfBytes(sheet: AnswerSheet, options: PdfDirectOption
     })
   })
 
+  if (options.packet) await decoratePdfPacket(doc, options.packet, doc.getPageCount())
   return doc.save()
 }
 

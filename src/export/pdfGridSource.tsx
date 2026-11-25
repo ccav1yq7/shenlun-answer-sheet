@@ -23,6 +23,7 @@ export async function* pdfGridSources(
   host.append(source)
   const root = createRoot(source)
   try {
+    await document.fonts.ready
     for (const block of blocks) {
       const card = plain && block.card ? {
         ...block.card,
@@ -33,10 +34,11 @@ export async function* pdfGridSources(
         ? 8 + (display.title ? 27 : 0) + (display.identity ? 9 : 0) + (display.name ? 17 : 0)
         : undefined
       const prompt = plain ? '' : answerCardPrompt(card, questionPrompt)
-      const promptHeight = promptHeightFor(prompt, answerCardPromptFontSize(card))
+      const measurePrompt = (layout: Parameters<typeof promptHeightFor>[3]) =>
+        promptHeightFor(prompt, answerCardPromptFontSize(card), card?.showPromptTitle !== false, layout)
       const rows = Math.ceil(block.capacity / sheet.columns)
-      const layout = forceA4 ? 'a4-single' : chooseLayout(sheet.columns, rows, sheet.mode, header, promptHeight)
-      const geometry = computeGeometry({ columns: sheet.columns, layout, compactHeaderHeight: header, promptHeight })
+      const layout = forceA4 ? 'a4-single' : chooseLayout(sheet.columns, rows, sheet.mode, header, measurePrompt('a4-single'))
+      const geometry = computeGeometry({ columns: sheet.columns, layout, compactHeaderHeight: header, promptHeight: measurePrompt(layout) })
       const doc = layoutDocument([{
         blockId: block.id, blockTitle: block.title, text: block.text,
         capacity: block.capacity, paragraphs: block.paragraphStyles,

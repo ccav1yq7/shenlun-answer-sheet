@@ -11,7 +11,7 @@ import { hasFenbiAssistant, requestFenbiAssistant } from './document/fenbiAssist
  *   本文件只做状态编排与事件转发，不含任何排版规则。
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { EditorSurface } from './components/EditorSurface'
 import type { EditorSurfaceHandle } from './components/EditorSurface'
 import { SheetView } from './components/SheetView'
@@ -22,6 +22,7 @@ import { AnswerCardDialog } from './components/AnswerCardDialog'
 import { PdfExportDialog } from './components/PdfExportDialog'
 import type { PdfOptions } from './components/PdfExportDialog'
 import { exportGridPdf, exportImages } from './export/exportImages'
+import type { PdfPacket } from './export/pdfPacket'
 import { pdfReadingPages } from './export/pdfReadingPages'
 import { pdfGridSources } from './export/pdfGridSource'
 import { PracticeDialog } from './components/PracticeDialog'
@@ -264,14 +265,28 @@ export default function App() {
   const questionPrompt = question?.paper?.questions[question.questionIndex ?? 0]?.prompt ?? question?.prompt ?? ''
   const cardPrompt = answerCardPrompt(activeBlock.card, questionPrompt)
   const cardPromptFontSize = answerCardPromptFontSize(activeBlock.card)
-  const promptHeight = useMemo(() => promptHeightFor(cardPrompt, cardPromptFontSize), [cardPrompt, cardPromptFontSize])
+  const showPromptTitle = activeBlock.card?.showPromptTitle !== false
+  const [promptHeights, setPromptHeights] = useState({ a4: 0, a3: 0 })
+  useLayoutEffect(() => {
+    let active = true
+    const measure = () => {
+      if (!active) return
+      setPromptHeights({
+        a4: promptHeightFor(cardPrompt, cardPromptFontSize, showPromptTitle, 'a4-single'),
+        a3: promptHeightFor(cardPrompt, cardPromptFontSize, showPromptTitle, 'a3-split'),
+      })
+    }
+    measure()
+    void document.fonts?.ready.then(measure)
+    return () => { active = false }
+  }, [cardPrompt, cardPromptFontSize, showPromptTitle])
 
-  // 单题练习时，题目装得进一页 A4 就用 A4 纵向（纸张缩小、格子不变）；装不下才用 A3 左右两栏
   const geometry = useMemo(() => {
     const capacityRows = activeCapacity > 0 ? Math.ceil(activeCapacity / sheet.columns) : 0
-    const layout = paperSize === 'a4' ? 'a4-single' : chooseLayout(sheet.columns, capacityRows, sheet.mode, compactHeaderHeight, promptHeight)
-    return computeGeometry({ columns: sheet.columns, layout, compactHeaderHeight, promptHeight })
-  }, [sheet.columns, sheet.mode, activeCapacity, compactHeaderHeight, promptHeight, paperSize])
+    const layout = paperSize === 'a4' ? 'a4-single' : chooseLayout(sheet.columns, capacityRows, sheet.mode, compactHeaderHeight, promptHeights.a4)
+    return computeGeometry({ columns: sheet.columns, layout, compactHeaderHeight,
+      promptHeight: layout === 'a4-single' ? promptHeights.a4 : promptHeights.a3 })
+  }, [sheet.columns, sheet.mode, activeCapacity, compactHeaderHeight, promptHeights, paperSize])
 
   const isSplit = geometry.panelsPerPage > 1
   const paperLabel = geometry.layout === 'a4-single' ? 'A4 纵向' : 'A3 横向'
@@ -909,7 +924,7 @@ export default function App() {
     }
   }, [sheet, showToast])
 
-  const handleExportPdf = useCallback(async (exportSheet: AnswerSheet, title?: string) => {
+  const handleExportPdf = useCallback(async (exportSheet: AnswerSheet, title?: string, packet?: PdfPacket) => {
     const container = printRef.current
     const fallbackToPrint = async (reason: string) => {
       if (!container) return
@@ -934,7 +949,7 @@ export default function App() {
 
     try {
       const { exportPdfDirect } = await import('./export/exportPdfDirect')
-      await exportPdfDirect(exportSheet, { keepIndent: false, title })
+      await exportPdfDirect(exportSheet, { keepIndent: false, title, packet })
       showToast('已导出 PDF（纯文字，不含方格，可直接下载）')
     } catch (error) {
       await fallbackToPrint(`直接导出失败（${error instanceof Error ? error.message : String(error)}）`)
@@ -966,7 +981,10 @@ export default function App() {
     if (exporting) return
     const selectedSets = question && ((options.prompt && question.prompt) || (options.materials && question.materials))
       ? pdfMarkChoices.filter((choice) => options.markIds.includes(choice.id)) : []
-    const front = selectedSets.length ? [] : questionBlocks(question, options)
+    const packet = { title: question?.paper?.title || currentPractice?.name || '申论练习', cover: options.cover }
+    const front = selectedSets.length ? [] : questionBlocks(question, options).reverse().map((block) => ({
+      ...block, title: block.title === '材料' ? '给定材料' : '作答要求',
+    }))
     const blocks = options.answer
       ? pdfCardChoices.filter((choice) => options.cardIds.includes(choice.id)).map((choice) => choice.block) : []
     if (options.review) {
@@ -980,7 +998,7 @@ export default function App() {
     setExporting(true)
     try {
       if (!selectedSets.length && (!blocks.length || options.style === 'text')) {
-        await handleExportPdf({ ...sheet, blocks: [...front, ...blocks] })
+        await handleExportPdf({ ...sheet, blocks: [...front, ...blocks] }, undefined, packet)
       } else {
         const host = exportSourceRef.current?.closest<HTMLElement>('.app')
         if (!host) throw new Error('答题卡尚未就绪')
@@ -990,6 +1008,7 @@ export default function App() {
           grid ? pdfGridSources(host, blocks, sheet, profile, paperSize === 'a4', options.style === 'plain-grid', questionPrompt) : undefined,
           textBlocks.length ? { ...sheet, blocks: textBlocks } : undefined,
           question && selectedSets.length ? pdfReadingPages(host, question, options, selectedSets) : undefined,
+          packet,
         )
         showToast('已导出 PDF')
       }
@@ -1526,7 +1545,7 @@ export default function App() {
           blockId={activeBlock.id}
           anchor={{ row: caret.rowIndex, column: caret.column, fraction: caret.fraction }}
           caretOffset={selection.start}
-          layoutKey={JSON.stringify([geometry.layout, geometry.cell, promptHeight,
+          layoutKey={JSON.stringify([geometry.layout, geometry.cell, geometry.promptHeight,
             currentCard.display.instructions ? 'standard' : [
               currentCard.display.title, currentCard.display.identity,
               activeBlock.card && currentCard.display.name ? currentCard.name : '',
@@ -1542,7 +1561,7 @@ export default function App() {
 
           {pdfDialog && <PdfExportDialog
             defaults={{
-              prompt: exportContent.prompt, materials: exportContent.materials, answer: exportContent.answer,
+              cover: false, prompt: exportContent.prompt, materials: exportContent.materials, answer: exportContent.answer,
               review: Boolean(exportContent.review), style: keepExportFormat ? 'grid' : 'text',
               markIds: exportContent.notes && activeMarkSet.marks.length ? [activeMarkSet.id] : [],
               cardIds: pdfCardChoices.filter((choice) => choice.current).map((choice) => choice.id),

@@ -108,13 +108,27 @@ export interface SheetGeometry {
   rowsForPage: (pageIndex: number) => number
 }
 
-/** Reserve room for question text in the first-page header, using the narrower A4 width. */
-export function promptHeightFor(text: string, fontSize = 8): number {
+/** Measure the same box and wrapping used by the first-page header. */
+export function promptHeightFor(text: string, fontSize: number, showTitle: boolean, layout: SheetLayout): number {
   if (!text.trim()) return 0
-  const charactersPerLine = Math.floor(480 / fontSize)
-  const lines = text.split(/\r?\n/).reduce((count, line) =>
-    count + Math.max(1, Math.ceil(Array.from(line).length / charactersPerLine)), 0)
-  return Math.min(105, 15 + lines * fontSize * 0.6)
+  const box = document.createElement('section')
+  box.className = 'notice sheet-question-prompt'
+  box.style.cssText = `position:fixed;visibility:hidden;pointer-events:none;width:${computeGeometry({ layout }).contentWidth}mm;`
+  if (showTitle) {
+    const title = document.createElement('b')
+    title.textContent = '题干'
+    box.append(title)
+  }
+  const body = document.createElement('div')
+  body.style.fontSize = `${fontSize}pt`
+  body.textContent = text
+  box.append(body)
+  document.body.append(box)
+  try {
+    return Math.ceil(box.getBoundingClientRect().height * 25.4 / 96 * 100) / 100 + 2
+  } finally {
+    box.remove()
+  }
 }
 
 export interface GeometryOptions {
